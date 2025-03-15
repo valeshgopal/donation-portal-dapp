@@ -1,7 +1,5 @@
 require('@nomicfoundation/hardhat-toolbox');
 require('dotenv').config();
-require('@nomicfoundation/hardhat-ethers');
-require('@nomicfoundation/hardhat-verify');
 
 const PRIVATE_KEY =
   process.env.PRIVATE_KEY ||

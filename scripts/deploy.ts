@@ -1,5 +1,4 @@
-import { run } from 'hardhat';
-import { ethers } from 'hardhat';
+import { run, ethers } from 'hardhat';
 
 async function main() {
   // Deploy the OpportunityFactory contract
