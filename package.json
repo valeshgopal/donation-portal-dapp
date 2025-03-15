@@ -23,7 +23,6 @@
     "zod": "^3.22.4"
   },
   "devDependencies": {
-    "@nomicfoundation/hardhat-ethers": "^3.0.8",
     "@nomicfoundation/hardhat-toolbox": "^5.0.0",
     "@openzeppelin/contracts": "^4.9.3",
     "@types/node": "^20.11.0",
