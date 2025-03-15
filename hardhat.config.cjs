@@ -1,5 +1,7 @@
 require('@nomicfoundation/hardhat-toolbox');
 require('dotenv').config();
+require('@nomicfoundation/hardhat-ethers');
+require('@nomicfoundation/hardhat-verify');
 
 const PRIVATE_KEY =
   process.env.PRIVATE_KEY ||
@@ -8,7 +10,7 @@ const SEPOLIA_URL = process.env.NEXT_PUBLIC_SEPOLIA_RPC_URL || '';
 
 const config = {
   solidity: {
-    version: '0.8.19',
+    version: '0.8.20',
     settings: {
       optimizer: {
         enabled: true,
@@ -22,7 +24,7 @@ const config = {
     },
     sepolia: {
       url: SEPOLIA_URL,
-      accounts: [PRIVATE_KEY],
+      accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
     },
   },
   etherscan: {
