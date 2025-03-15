@@ -1,6 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-    output: 'standalone',
+    output: 'export',
     reactStrictMode: true,
     images: {
         domains: ['ipfs.io', 'images.unsplash.com'], // Allow IPFS gateway for images and Unsplash
