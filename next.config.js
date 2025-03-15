@@ -1,8 +1,9 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+    output: 'standalone',
     reactStrictMode: true,
     images: {
-        domains: ['ipfs.io', 'images.unsplash.com'], // Allow IPFS gateway for images and Unsplash
+        remotePatterns: ['ipfs.io', 'images.unsplash.com'], // Allow IPFS gateway for images and Unsplash
     },
     webpack: (config) => {
         config.resolve.fallback = {
