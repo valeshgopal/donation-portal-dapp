@@ -1,7 +1,6 @@
 import { run, ethers } from 'hardhat';
 
 async function main() {
-  // Deploy the OpportunityFactory contract
   const OpportunityFactory = await ethers.getContractFactory(
     'OpportunityFactory'
   );
