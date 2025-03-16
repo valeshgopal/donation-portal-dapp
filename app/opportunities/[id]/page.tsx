@@ -7,15 +7,16 @@ import { useAccount } from 'wagmi';
 import { useDonationOpportunities } from '../../hooks/useDonationOpportunities';
 import { Opportunity } from '../../lib/contracts/types';
 import { formatEther, parseEther } from 'viem';
+import { Suspense } from 'react';
 
 // Helper function to get Sepolia explorer URLs
 const getExplorerUrl = (type: 'tx' | 'address', hash: string) => {
   return `https://sepolia.etherscan.io/${type}/${hash}`;
 };
 
-export default function OpportunityDetailPage() {
+function OpportunityContent() {
   const params = useParams();
-  const opportunityAddress = params.id as `0x${string}`;
+  const opportunityAddress = params?.id as `0x${string}`;
   const { address } = useAccount();
   const [opportunity, setOpportunity] = useState<Opportunity | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -276,5 +277,23 @@ export default function OpportunityDetailPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function OpportunityDetailPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className='container mx-auto px-4 py-8'>
+          <div className='animate-pulse space-y-4'>
+            <div className='h-8 bg-gray-200 rounded w-1/2'></div>
+            <div className='h-4 bg-gray-200 rounded w-3/4'></div>
+            <div className='h-32 bg-gray-200 rounded'></div>
+          </div>
+        </div>
+      }
+    >
+      <OpportunityContent />
+    </Suspense>
   );
 }

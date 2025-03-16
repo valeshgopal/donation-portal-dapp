@@ -140,7 +140,7 @@ export function OpportunityCard({
         <div className='mt-6 space-y-2'>
           <div className='client-only'>
             <Link
-              href={`/opportunities/${opportunity.id}`}
+              href={`/opportunities/${opportunity.address}`}
               className='block text-center bg-primary text-white py-2 px-4 rounded-md hover:bg-primary/90'
             >
               View Details

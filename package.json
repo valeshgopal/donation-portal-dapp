@@ -4,7 +4,6 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "prebuild": "mkdir -p .next && echo '{}' > .next/export-detail.json",
     "build": "next build",
     "start": "next start",
     "lint": "next lint"
