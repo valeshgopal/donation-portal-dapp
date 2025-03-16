@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "prebuild": "mkdir -p .next && echo '{}' > .next/export-detail.json",
     "build": "next build",
     "start": "next start",
     "lint": "next lint"
@@ -38,5 +39,8 @@
     "postcss": "^8.4.35",
     "tailwindcss": "^3.4.1",
     "typescript": "^5.3.0"
+  },
+  "engines": {
+    "node": ">=18.17.1"
   }
 }
