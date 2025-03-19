@@ -2,8 +2,9 @@
 pragma solidity ^0.8.19;
 
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
 
-contract DonationOpportunity is ReentrancyGuard {
+contract DonationOpportunity is ReentrancyGuard, Ownable {
     struct UserDonation {
         uint256 amount;
         uint256 timestamp;
@@ -17,6 +18,15 @@ contract DonationOpportunity is ReentrancyGuard {
     string public metadataURI;
     bool public active;
     uint256 public createdAt;
+    
+    // Fee configuration
+    uint256 public constant FEE_PERCENTAGE = 500; // 5% (500/10000)
+    uint256 public constant FEE_DENOMINATOR = 10000;
+    address public feeRecipient;
+    address public factory;
+    
+    // Fee tracking
+    uint256 public totalFeesCollected;
 
     // Mapping to track donations by user
     mapping(address => UserDonation[]) public userDonations;
@@ -28,10 +38,13 @@ contract DonationOpportunity is ReentrancyGuard {
     event DonationReceived(
         address indexed donor,
         uint256 amount,
-        uint256 timestamp
+        uint256 timestamp,
+        uint256 fee
     );
     event OpportunityStatusChanged(bool active);
     event FundsWithdrawn(address indexed recipient, uint256 amount);
+    event FeeTransferred(address indexed feeRecipient, uint256 amount);
+    event FeeRecipientUpdated(address indexed newFeeRecipient);
 
     modifier onlyCreator() {
         require(msg.sender == creatorAddress, "Only creator can call this");
@@ -43,17 +56,23 @@ contract DonationOpportunity is ReentrancyGuard {
         uint256 _fundingGoal,
         address _recipientWallet,
         address _creatorAddress,
-        string memory _metadataURI
+        string memory _metadataURI,
+        address _feeRecipient,
+        address _factory
     ) {
         require(_fundingGoal > 0, "Funding goal must be greater than 0");
         require(_recipientWallet != address(0), "Invalid recipient address");
         require(_creatorAddress != address(0), "Invalid creator address");
+        require(_feeRecipient != address(0), "Invalid fee recipient address");
+        require(_factory != address(0), "Invalid factory address");
 
         title = _title;
         fundingGoal = _fundingGoal;
         recipientWallet = _recipientWallet;
         creatorAddress = _creatorAddress;
         metadataURI = _metadataURI;
+        feeRecipient = _feeRecipient;
+        factory = _factory;
         active = true;
         createdAt = block.timestamp;
     }
@@ -61,8 +80,24 @@ contract DonationOpportunity is ReentrancyGuard {
     function donate() external payable nonReentrant {
         require(active, "Opportunity is not active");
         require(msg.value > 0, "Donation amount must be greater than 0");
+        require(currentRaised + msg.value <= fundingGoal, "Target amount exceeded");
 
+        // Calculate fee (5%)
+        uint256 fee = (msg.value * FEE_PERCENTAGE) / FEE_DENOMINATOR;
+        uint256 recipientAmount = msg.value - fee;
+
+        // Send fee to factory contract
+        (bool feeSuccess, ) = address(factory).call{value: fee}("");
+        require(feeSuccess, "Fee transfer failed");
+        emit FeeTransferred(feeRecipient, fee);
+
+        // Send remaining amount to recipient
+        (bool recipientSuccess, ) = recipientWallet.call{value: recipientAmount}("");
+        require(recipientSuccess, "Recipient transfer failed");
+
+        // Update state
         currentRaised += msg.value;
+        totalFeesCollected += fee;
 
         // Record donation
         userDonations[msg.sender].push(UserDonation({
@@ -76,7 +111,13 @@ contract DonationOpportunity is ReentrancyGuard {
             donors.push(msg.sender);
         }
 
-        emit DonationReceived(msg.sender, msg.value, block.timestamp);
+        emit DonationReceived(msg.sender, msg.value, block.timestamp, fee);
+    }
+
+    function updateFeeRecipient(address _newFeeRecipient) external onlyOwner {
+        require(_newFeeRecipient != address(0), "Invalid fee recipient address");
+        feeRecipient = _newFeeRecipient;
+        emit FeeRecipientUpdated(_newFeeRecipient);
     }
 
     function stopOpportunity() external onlyCreator {
@@ -118,7 +159,9 @@ contract DonationOpportunity is ReentrancyGuard {
         string memory _metadataURI,
         bool _active,
         uint256 _createdAt,
-        uint256 _donorCount
+        uint256 _donorCount,
+        uint256 _totalFeesCollected,
+        address _feeRecipient
     ) {
         return (
             title,
@@ -129,7 +172,9 @@ contract DonationOpportunity is ReentrancyGuard {
             metadataURI,
             active,
             createdAt,
-            donors.length
+            donors.length,
+            totalFeesCollected,
+            feeRecipient
         );
     }
 } 

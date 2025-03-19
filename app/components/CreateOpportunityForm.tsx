@@ -452,27 +452,38 @@ export function CreateOpportunityForm() {
         );
       }
 
-      console.log('Starting document upload to IPFS...');
       // Upload documents to IPFS
       try {
         const uploadedDocs = await Promise.all(
           documents.map(async (doc) => {
-            console.log(`Uploading document: ${doc.file.name}`);
             setUploadProgress((prev) => ({
               ...prev,
               [doc.type]: 25,
             }));
-            const ipfsHash = await uploadFileToIPFS(doc.file);
-            setUploadProgress((prev) => ({
-              ...prev,
-              [doc.type]: 100,
-            }));
-            console.log(`Document uploaded with hash: ${ipfsHash}`);
-            return {
-              ipfsHash,
-              fileType: doc.file.type,
-              type: doc.type,
-            };
+            try {
+              const ipfsHash = await uploadFileToIPFS(doc.file);
+              setUploadProgress((prev) => ({
+                ...prev,
+                [doc.type]: 100,
+              }));
+              return {
+                ipfsHash,
+                fileType: doc.file.type,
+                type: doc.type,
+              };
+            } catch (uploadError) {
+              console.error(
+                `Error uploading document ${doc.file.name}:`,
+                uploadError
+              );
+              throw new Error(
+                `Failed to upload ${doc.file.name}: ${
+                  uploadError instanceof Error
+                    ? uploadError.message
+                    : 'Unknown error'
+                }`
+              );
+            }
           })
         );
 
@@ -484,7 +495,7 @@ export function CreateOpportunityForm() {
         const proofDocs = uploadedDocs.filter((doc) => doc.type === 'proof');
 
         setCreationStage('uploading_metadata');
-        console.log('Creating metadata...');
+
         // Create metadata
         const metadata = {
           title: formData.title,
@@ -496,7 +507,6 @@ export function CreateOpportunityForm() {
           proofs: proofDocs,
         };
 
-        console.log('Uploading metadata to IPFS...');
         // Upload metadata to IPFS
         const metadataBlob = new Blob([JSON.stringify(metadata)], {
           type: 'application/json',
@@ -504,32 +514,34 @@ export function CreateOpportunityForm() {
         const metadataFile = new File([metadataBlob], 'metadata.json', {
           type: 'application/json',
         });
-        const metadataURI = await uploadFileToIPFS(metadataFile);
-        console.log(`Metadata uploaded with URI: ${metadataURI}`);
+        try {
+          const metadataURI = await uploadFileToIPFS(metadataFile);
 
-        setCreationStage('deploying');
-        console.log('Creating opportunity contract...');
-        // Deploy opportunity contract
-        if (!opportunityFactory) {
-          throw new Error('Opportunity factory contract is not initialized');
+          setCreationStage('deploying');
+
+          // Deploy opportunity contract
+          if (!opportunityFactory) {
+            throw new Error('Opportunity factory contract is not initialized');
+          }
+
+          const tx = await opportunityFactory.createOpportunity(
+            formData.title,
+            formData.fundingGoal,
+            formData.recipientWallet as `0x${string}`,
+            metadataURI
+          );
+
+          setTxHash(tx as `0x${string}`);
+        } catch (metadataError) {
+          console.error('Error uploading metadata:', metadataError);
+          throw new Error(
+            `Failed to upload metadata: ${
+              metadataError instanceof Error
+                ? metadataError.message
+                : 'Unknown error'
+            }`
+          );
         }
-
-        console.log('Deploying with params:', {
-          title: formData.title,
-          fundingGoal: formData.fundingGoal,
-          recipientWallet: formData.recipientWallet,
-          metadataURI,
-        });
-
-        const tx = await opportunityFactory.createOpportunity(
-          formData.title,
-          formData.fundingGoal,
-          formData.recipientWallet as `0x${string}`,
-          metadataURI
-        );
-
-        console.log('Transaction submitted:', tx);
-        setTxHash(tx as `0x${string}`);
       } catch (uploadError) {
         // Reset progress on error
         setUploadProgress({ kyc: 0, proof: 0 });

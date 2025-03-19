@@ -20,11 +20,9 @@ export default function OpportunitiesPage() {
 
   const fetchOpportunities = useCallback(async () => {
     try {
-      console.log('Fetching opportunities...');
       setError(null);
       setIsLoading(true);
       const opps = await donationOpportunities.getAllOpportunities();
-      console.log('Fetched opportunities:', opps);
       setOpportunities(opps);
       setFilteredOpportunities(opps);
       setLastRefresh(new Date());

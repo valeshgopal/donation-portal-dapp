@@ -55,7 +55,6 @@ export default function Home() {
       try {
         setLoading(true);
         const featured = await getFeaturedOpportunities();
-        console.log('Fetched featured opportunities:', featured);
         setOpportunities(featured);
       } catch (error) {
         console.error('Error fetching opportunities:', error);
@@ -150,15 +149,17 @@ export default function Home() {
         </div>
 
         <div className='mb-8'>
-          <div className='flex justify-between items-center mb-6'>
-            <h2 className='text-2xl font-bold'>Featured Opportunities</h2>
-            <Link
-              href='/opportunities'
-              className='text-primary hover:text-primary/80 font-medium'
-            >
-              View All
-            </Link>
-          </div>
+          {opportunities.length > 0 && (
+            <div className='flex justify-between items-center mb-6'>
+              <h2 className='text-2xl font-bold'>Featured Opportunities</h2>
+              <Link
+                href='/opportunities'
+                className='text-primary hover:text-primary/80 font-medium'
+              >
+                View All
+              </Link>
+            </div>
+          )}
 
           {loading ? (
             <div className='animate-pulse grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6'>

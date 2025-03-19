@@ -18,8 +18,6 @@ import { type PublicClient, type WalletClient } from 'viem';
 const FACTORY_ADDRESS = process.env
   .NEXT_PUBLIC_OPPORTUNITY_FACTORY_ADDRESS as `0x${string}`;
 
-console.log('Factory Address:', FACTORY_ADDRESS);
-
 type OpportunityMetadata = {
   title: string;
   summary: string;
@@ -154,7 +152,6 @@ export function useDonationOpportunities() {
             )
           )
         );
-        console.log('Fetched opportunity details:', details);
         setOpportunities(details);
       } catch (err) {
         console.error('Error fetching opportunities:', err);

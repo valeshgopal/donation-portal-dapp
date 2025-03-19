@@ -1,22 +1,50 @@
 import { create } from '@web3-storage/w3up-client';
 
 let client: Awaited<ReturnType<typeof create>> | null = null;
+let isInitializing = false;
 
 export async function getIPFSClient() {
-  if (client) return client;
+  if (client) {
+    return client;
+  }
+
+  if (isInitializing) {
+    // Wait for initialization to complete
+    while (isInitializing) {
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+    if (client) {
+      return client;
+    }
+  }
 
   try {
+    isInitializing = true;
     client = await create();
-    await client.login(
-      process.env.NEXT_PUBLIC_W3UP_PRINCIPAL! as `${string}@${string}`
-    );
-    await client.setCurrentSpace(
-      process.env.NEXT_PUBLIC_W3UP_PROOF! as `did:${string}:${string}`
-    );
+
+    const principal = process.env.NEXT_PUBLIC_W3UP_PRINCIPAL;
+    const proof = process.env.NEXT_PUBLIC_W3UP_PROOF;
+
+    if (!principal || !proof) {
+      throw new Error(
+        'Missing Web3.Storage credentials. Please check your environment variables.'
+      );
+    }
+
+    await client.login(principal as `${string}@${string}`);
+
+    await client.setCurrentSpace(proof as `did:${string}:${string}`);
+
     return client;
   } catch (error) {
     console.error('Error initializing IPFS client:', error);
-    throw error;
+    throw new Error(
+      `Failed to initialize IPFS client: ${
+        error instanceof Error ? error.message : 'Unknown error'
+      }`
+    );
+  } finally {
+    isInitializing = false;
   }
 }
 
