@@ -3,8 +3,9 @@ pragma solidity ^0.8.19;
 
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/security/Pausable.sol";
 
-contract DonationOpportunity is ReentrancyGuard, Ownable {
+contract DonationOpportunity is ReentrancyGuard, Ownable, Pausable {
     struct UserDonation {
         uint256 amount;
         uint256 timestamp;
@@ -45,6 +46,9 @@ contract DonationOpportunity is ReentrancyGuard, Ownable {
     event FundsWithdrawn(address indexed recipient, uint256 amount);
     event FeeTransferred(address indexed feeRecipient, uint256 amount);
     event FeeRecipientUpdated(address indexed newFeeRecipient);
+    event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
+    event Paused(address account);
+    event Unpaused(address account);
 
     modifier onlyCreator() {
         require(msg.sender == creatorAddress, "Only creator can call this");
@@ -75,9 +79,12 @@ contract DonationOpportunity is ReentrancyGuard, Ownable {
         factory = _factory;
         active = true;
         createdAt = block.timestamp;
+        
+        // Transfer ownership to creator instead of deployer
+        _transferOwnership(_creatorAddress);
     }
 
-    function donate() external payable nonReentrant {
+    function donate() external payable nonReentrant whenNotPaused {
         require(active, "Opportunity is not active");
         require(msg.value > 0, "Donation amount must be greater than 0");
         require(currentRaised + msg.value <= fundingGoal, "Target amount exceeded");
@@ -86,16 +93,7 @@ contract DonationOpportunity is ReentrancyGuard, Ownable {
         uint256 fee = (msg.value * FEE_PERCENTAGE) / FEE_DENOMINATOR;
         uint256 recipientAmount = msg.value - fee;
 
-        // Send fee to factory contract
-        (bool feeSuccess, ) = address(factory).call{value: fee}("");
-        require(feeSuccess, "Fee transfer failed");
-        emit FeeTransferred(feeRecipient, fee);
-
-        // Send remaining amount to recipient
-        (bool recipientSuccess, ) = recipientWallet.call{value: recipientAmount}("");
-        require(recipientSuccess, "Recipient transfer failed");
-
-        // Update state
+        // Update state BEFORE external calls (Checks-Effects-Interactions pattern)
         currentRaised += msg.value;
         totalFeesCollected += fee;
 
@@ -110,6 +108,15 @@ contract DonationOpportunity is ReentrancyGuard, Ownable {
             hasDonated[msg.sender] = true;
             donors.push(msg.sender);
         }
+
+        // Send fee to factory contract AFTER state updates
+        (bool feeSuccess, ) = address(factory).call{value: fee}("");
+        require(feeSuccess, "Fee transfer failed");
+        emit FeeTransferred(feeRecipient, fee);
+
+        // Send remaining amount to recipient AFTER state updates
+        (bool recipientSuccess, ) = recipientWallet.call{value: recipientAmount}("");
+        require(recipientSuccess, "Recipient transfer failed");
 
         emit DonationReceived(msg.sender, msg.value, block.timestamp, fee);
     }
@@ -126,15 +133,32 @@ contract DonationOpportunity is ReentrancyGuard, Ownable {
         emit OpportunityStatusChanged(false);
     }
 
-    function withdraw() external nonReentrant {
-        require(msg.sender == recipientWallet, "Only recipient can withdraw");
-        require(address(this).balance > 0, "No funds to withdraw");
+    function startOpportunity() external onlyCreator {
+        require(!active, "Opportunity is already active");
+        active = true;
+        emit OpportunityStatusChanged(true);
+    }
 
+    // Remove the incorrect withdraw function as funds are directly sent to recipient
+    // If emergency fund recovery is needed, use a separate function with proper access control
+
+    // Emergency fund recovery function
+    function emergencyWithdraw() external onlyOwner nonReentrant {
         uint256 amount = address(this).balance;
-        (bool success, ) = recipientWallet.call{value: amount}("");
-        require(success, "Withdrawal failed");
+        require(amount > 0, "No funds to withdraw");
+        
+        (bool success, ) = owner().call{value: amount}("");
+        require(success, "Emergency withdrawal failed");
+        
+        emit FundsWithdrawn(owner(), amount);
+    }
 
-        emit FundsWithdrawn(recipientWallet, amount);
+    function pause() external onlyOwner {
+        _pause();
+    }
+
+    function unpause() external onlyOwner {
+        _unpause();
     }
 
     function getUserDonations(address _user) external view returns (UserDonation[] memory) {
@@ -142,7 +166,40 @@ contract DonationOpportunity is ReentrancyGuard, Ownable {
     }
 
     function getDonors() external view returns (address[] memory) {
-        return donors;
+        uint256 count = donors.length;
+        uint256 pageSize = 100;
+        uint256 pages = (count + pageSize - 1) / pageSize; // Ceiling division
+        
+        // Return only first page or full list if smaller than page size
+        uint256 returnSize = count < pageSize ? count : pageSize;
+        address[] memory result = new address[](returnSize);
+        
+        for (uint256 i = 0; i < returnSize; i++) {
+            result[i] = donors[i];
+        }
+        
+        return result;
+    }
+
+    function getDonorsPaginated(uint256 _page, uint256 _pageSize) external view returns (address[] memory) {
+        uint256 count = donors.length;
+        uint256 startIndex = _page * _pageSize;
+        
+        require(startIndex < count, "Page out of bounds");
+        
+        uint256 endIndex = startIndex + _pageSize;
+        if (endIndex > count) {
+            endIndex = count;
+        }
+        
+        uint256 resultSize = endIndex - startIndex;
+        address[] memory result = new address[](resultSize);
+        
+        for (uint256 i = 0; i < resultSize; i++) {
+            result[i] = donors[startIndex + i];
+        }
+        
+        return result;
     }
 
     function getDonorCount() external view returns (uint256) {
@@ -177,4 +234,4 @@ contract DonationOpportunity is ReentrancyGuard, Ownable {
             feeRecipient
         );
     }
-} 
+}

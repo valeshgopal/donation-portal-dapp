@@ -47,11 +47,17 @@ contract DonationPlatform is Ownable, ReentrancyGuard, Pausable {
     event FeePercentageUpdated(uint256 newPercentage);
     event FeeWithdrawn(address indexed owner, uint256 amount);
     event OpportunityCreated(uint256 indexed id, string ipfsHash, address recipient);
-    event DonationMade(uint256 indexed id, address donor, uint256 amount);
+    event DonationMadeToOpportunity(uint256 indexed id, address donor, uint256 amount, uint256 fee);
+    event OpportunityStatusChanged(uint256 indexed id, bool active);
     
     // Modifiers
     modifier onlyVerifiedRecipient(address _recipient) {
         require(recipients[_recipient].isVerified, "Recipient not verified");
+        _;
+    }
+    
+    modifier opportunityExists(uint256 _id) {
+        require(_id < nextOpportunityId, "Opportunity does not exist");
         _;
     }
     
@@ -65,6 +71,9 @@ contract DonationPlatform is Ownable, ReentrancyGuard, Pausable {
      * @param _metadata IPFS hash containing recipient details
      */
     function verifyRecipient(address _recipient, string calldata _metadata) external onlyOwner {
+        require(_recipient != address(0), "Invalid recipient address");
+        require(bytes(_metadata).length > 0, "Empty metadata not allowed");
+        
         recipients[_recipient].isVerified = true;
         recipients[_recipient].metadata = _metadata;
         emit RecipientVerified(_recipient, _metadata);
@@ -75,6 +84,7 @@ contract DonationPlatform is Ownable, ReentrancyGuard, Pausable {
      * @param _recipient Address of the recipient
      */
     function unverifyRecipient(address _recipient) external onlyOwner {
+        require(_recipient != address(0), "Invalid recipient address");
         recipients[_recipient].isVerified = false;
         emit RecipientUnverified(_recipient);
     }
@@ -93,7 +103,7 @@ contract DonationPlatform is Ownable, ReentrancyGuard, Pausable {
      * @dev Make a donation to a verified recipient
      * @param _recipient Address of the recipient
      */
-    function donate(address _recipient) 
+    function donateToRecipient(address _recipient) 
         external 
         payable 
         nonReentrant 
@@ -102,15 +112,16 @@ contract DonationPlatform is Ownable, ReentrancyGuard, Pausable {
     {
         require(msg.value > 0, "Donation must be greater than 0");
         
+        // Calculate fee
         uint256 fee = (msg.value * feePercentage) / FEE_DENOMINATOR;
         uint256 donation = msg.value - fee;
         
-        // Update state
+        // Update state BEFORE external calls
         totalDonations += donation;
         totalFees += fee;
         recipients[_recipient].totalReceived += donation;
         
-        // Transfer donation to recipient
+        // Transfer donation to recipient AFTER state updates
         (bool success, ) = _recipient.call{value: donation}("");
         require(success, "Failed to send donation");
         
@@ -124,6 +135,7 @@ contract DonationPlatform is Ownable, ReentrancyGuard, Pausable {
         uint256 amount = totalFees;
         require(amount > 0, "No fees to withdraw");
         
+        // Update state BEFORE external call
         totalFees = 0;
         
         (bool success, ) = owner().call{value: amount}("");
@@ -154,7 +166,14 @@ contract DonationPlatform is Ownable, ReentrancyGuard, Pausable {
         return recipients[_recipient];
     }
 
+    /**
+     * @dev Create a new donation opportunity
+     * @param _ipfsHash IPFS hash containing opportunity details
+     * @return id The ID of the created opportunity
+     */
     function createOpportunity(string memory _ipfsHash) public returns (uint256) {
+        require(bytes(_ipfsHash).length > 0, "Empty IPFS hash not allowed");
+        
         uint256 id = nextOpportunityId++;
         opportunities[id] = Opportunity({
             ipfsHash: _ipfsHash,
@@ -167,18 +186,69 @@ contract DonationPlatform is Ownable, ReentrancyGuard, Pausable {
         return id;
     }
 
-    function donate(uint256 _id) public payable {
+    /**
+     * @dev Donate to a specific opportunity
+     * @param _id The ID of the opportunity
+     */
+    function donateToOpportunity(uint256 _id) 
+        public 
+        payable 
+        nonReentrant 
+        whenNotPaused 
+        opportunityExists(_id) 
+    {
         require(opportunities[_id].active, "Opportunity not active");
-        opportunities[_id].raised += msg.value;
+        require(msg.value > 0, "Donation must be greater than 0");
         
-        emit DonationMade(_id, msg.sender, msg.value);
+        // Calculate fee (consistent with donateToRecipient)
+        uint256 fee = (msg.value * feePercentage) / FEE_DENOMINATOR;
+        uint256 donation = msg.value - fee;
         
-        // Transfer donation to recipient
-        (bool sent, ) = opportunities[_id].recipient.call{value: msg.value}("");
+        // Update state BEFORE external calls
+        opportunities[_id].raised += donation;
+        totalDonations += donation;
+        totalFees += fee;
+        
+        emit DonationMadeToOpportunity(_id, msg.sender, donation, fee);
+        
+        // Transfer donation to recipient AFTER state updates
+        (bool sent, ) = opportunities[_id].recipient.call{value: donation}("");
         require(sent, "Failed to send donation");
     }
 
-    function getOpportunity(uint256 _id) public view returns (Opportunity memory) {
+    /**
+     * @dev Change opportunity active status
+     * @param _id The ID of the opportunity
+     * @param _active New active status
+     */
+    function setOpportunityStatus(uint256 _id, bool _active) 
+        external 
+        opportunityExists(_id) 
+    {
+        require(msg.sender == opportunities[_id].recipient || msg.sender == owner(), 
+                "Only recipient or owner can change status");
+        
+        opportunities[_id].active = _active;
+        emit OpportunityStatusChanged(_id, _active);
+    }
+
+    /**
+     * @dev Get opportunity details
+     * @param _id The ID of the opportunity
+     */
+    function getOpportunity(uint256 _id) 
+        public 
+        view 
+        opportunityExists(_id) 
+        returns (Opportunity memory) 
+    {
         return opportunities[_id];
     }
-} 
+
+    /**
+     * @dev Get opportunities count
+     */
+    function getOpportunityCount() public view returns (uint256) {
+        return nextOpportunityId;
+    }
+}
