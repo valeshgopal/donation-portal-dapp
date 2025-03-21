@@ -1,14 +1,15 @@
 import Link from 'next/link';
 import { useState } from 'react';
 import { Opportunity } from '../lib/contracts/types';
-import { Address, formatEther, parseEther } from 'viem';
-
+import { formatEther, parseEther } from 'viem';
 export interface OpportunityCardProps {
   opportunity: Opportunity;
   userAddress?: `0x${string}`;
   onStopCampaign: (id: bigint) => Promise<void>;
   onDonate: (id: bigint, amount: bigint) => Promise<void>;
   featured?: boolean;
+  showStopButton?: boolean;
+  totalUserDonation?: number;
 }
 
 export function OpportunityCard({
@@ -17,6 +18,8 @@ export function OpportunityCard({
   onStopCampaign,
   onDonate,
   featured,
+  showStopButton = true,
+  totalUserDonation,
 }: OpportunityCardProps) {
   const [isUpdating, setIsUpdating] = useState(false);
   const [donationAmount, setDonationAmount] = useState('');
@@ -137,6 +140,13 @@ export function OpportunityCard({
           </form>
         )}
 
+        {totalUserDonation && (
+          <p className='text-xs text-gray-500 mt-1'>
+            Your contribution:{' '}
+            <span className='font-semibold'>{totalUserDonation} ETH</span>
+          </p>
+        )}
+
         <div className='mt-6 space-y-2'>
           <div className='client-only'>
             <Link
@@ -147,7 +157,8 @@ export function OpportunityCard({
             </Link>
           </div>
 
-          {userAddress &&
+          {showStopButton &&
+            userAddress &&
             opportunity.creatorAddress === userAddress &&
             opportunity.active && (
               <button

@@ -15,6 +15,7 @@ export type Opportunity = {
   active: boolean;
   creatorAddress: `0x${string}`;
   metadataURI: string;
+  totalUserDonation: number;
 };
 
 export interface UserDonation {

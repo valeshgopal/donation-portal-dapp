@@ -472,10 +472,7 @@ export function CreateOpportunityForm() {
                 type: doc.type,
               };
             } catch (uploadError) {
-              console.error(
-                `Error uploading document ${doc.file.name}:`,
-                uploadError
-              );
+              setError(`Error uploading document ${doc.file.name}:`);
               throw new Error(
                 `Failed to upload ${doc.file.name}: ${
                   uploadError instanceof Error
@@ -533,7 +530,7 @@ export function CreateOpportunityForm() {
 
           setTxHash(tx as `0x${string}`);
         } catch (metadataError) {
-          console.error('Error uploading metadata:', metadataError);
+          setError(`Error uploading metadata: ${metadataError}`);
           throw new Error(
             `Failed to upload metadata: ${
               metadataError instanceof Error
@@ -546,7 +543,7 @@ export function CreateOpportunityForm() {
         // Reset progress on error
         setUploadProgress({ kyc: 0, proof: 0 });
         setCreationStage('idle');
-        console.error('Error during upload process:', uploadError);
+        setError(`Error during upload process: ${uploadError}`);
         throw new Error(
           `Upload failed: ${
             uploadError instanceof Error ? uploadError.message : 'Unknown error'

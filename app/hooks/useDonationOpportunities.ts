@@ -43,6 +43,32 @@ export type DonationOpportunity = {
   metadata?: OpportunityMetadata;
 };
 
+// Define the return type for the hook
+interface DonationOpportunitiesHook {
+  opportunities: DonationOpportunity[];
+  isLoading: boolean;
+  error: Error | null;
+  createOpportunity: (
+    title: string,
+    summary: string,
+    description: string,
+    location: string,
+    cause: string[],
+    fundingGoal: bigint,
+    walletAddress: `0x${string}`,
+    metadataURI: string
+  ) => Promise<bigint>;
+  donate: (id: bigint, value: bigint) => Promise<void>;
+  getActiveOpportunities: DonationOpportunitiesContract['getActiveOpportunities'];
+  getAllOpportunities: DonationOpportunitiesContract['getAllOpportunities'];
+  getOpportunity: DonationOpportunitiesContract['getOpportunity'];
+  stopOpportunity: (id: bigint) => Promise<void>;
+  getUserDonatedOpportunities: DonationOpportunitiesContract['getUserDonatedOpportunities'];
+  getUserDonationsForOpportunity: DonationOpportunitiesContract['getUserDonationsForOpportunity'];
+  getFeaturedOpportunities: DonationOpportunitiesContract['getFeaturedOpportunities'];
+  refetch: () => Promise<any>;
+}
+
 // Helper function to fetch metadata from IPFS
 const fetchMetadata = async (
   metadataURI: string
@@ -60,7 +86,7 @@ const fetchMetadata = async (
   }
 };
 
-export function useDonationOpportunities() {
+export function useDonationOpportunities(): DonationOpportunitiesHook {
   const [opportunities, setOpportunities] = useState<DonationOpportunity[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
@@ -392,6 +418,14 @@ export function useDonationOpportunities() {
     [opportunities, publicClient]
   );
 
+  const getTotalDonationsInEth = (donations: any[]) => {
+    const totalWei = donations.reduce(
+      (total, donation) => total + BigInt(donation.amount),
+      BigInt(0)
+    );
+    return Number(totalWei) / 1e18; // Convert to ETH after summing
+  };
+
   const getUserDonatedOpportunities = useCallback<
     DonationOpportunitiesContract['getUserDonatedOpportunities']
   >(
@@ -416,8 +450,9 @@ export function useDonationOpportunities() {
               index
             );
             return {
-              id: BigInt(index),
+              id: BigInt(parseInt(opp.address.slice(2), 16)),
               title: details.title,
+              address: opp.address,
               summary: details.metadata?.summary || '',
               description: details.metadata?.description || '',
               location: details.metadata?.location || '',
@@ -429,6 +464,7 @@ export function useDonationOpportunities() {
               active: details.active,
               creatorAddress: details.creatorAddress,
               metadataURI: details.metadataURI,
+              totalUserDonation: getTotalDonationsInEth(donations as any[]),
             } as Opportunity;
           } catch (error) {
             console.error(

@@ -35,7 +35,7 @@ export default function DashboardPage() {
     };
 
     fetchDonatedOpportunities();
-  }, [address, donationOpportunities]);
+  }, [address, donationOpportunities.getUserDonatedOpportunities]);
 
   const handleDonate = async (id: bigint, amount: bigint) => {
     try {
@@ -51,6 +51,16 @@ export default function DashboardPage() {
     }
   };
 
+  if (isLoading) {
+    return (
+      <div className='animate-pulse grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 my-12 mx-4'>
+        {[1, 2, 3].map((i) => (
+          <div key={i} className='h-96 w-356 bg-gray-200 rounded-lg'></div>
+        ))}
+      </div>
+    );
+  }
+
   if (!address) {
     return (
       <div className='container mx-auto px-4 py-16'>
@@ -61,18 +71,6 @@ export default function DashboardPage() {
           <p className='text-gray-600 mb-8'>
             Please connect your wallet to view your donation history.
           </p>
-        </div>
-      </div>
-    );
-  }
-
-  if (isLoading) {
-    return (
-      <div className='container mx-auto px-4 py-8'>
-        <div className='animate-pulse space-y-4'>
-          {[1, 2, 3].map((i) => (
-            <div key={i} className='h-48 bg-gray-200 rounded-lg'></div>
-          ))}
         </div>
       </div>
     );
@@ -90,6 +88,8 @@ export default function DashboardPage() {
               opportunity={opportunity}
               userAddress={address}
               onDonate={handleDonate}
+              showStopButton={false}
+              totalUserDonation={opportunity.totalUserDonation}
               onStopCampaign={async () => {}} // Empty function since we don't need stop functionality here
             />
           ))}
