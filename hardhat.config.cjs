@@ -1,9 +1,6 @@
 require('@nomicfoundation/hardhat-toolbox');
 require('dotenv').config();
 
-const PRIVATE_KEY =
-  process.env.PRIVATE_KEY ||
-  '0000000000000000000000000000000000000000000000000000000000000000';
 const SEPOLIA_URL = process.env.NEXT_PUBLIC_SEPOLIA_RPC_URL || '';
 
 const config = {

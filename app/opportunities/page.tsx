@@ -17,11 +17,24 @@ export default function OpportunitiesPage() {
   const [error, setError] = useState<string | null>(null);
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
   const [showModal, setShowModal] = useState(true);
+  const [isModalOpened, setIsModalOpened] = useState(false);
 
-  const isModalOpened = localStorage.getItem('platformFeeModal');
+  // Check localStorage only after component mounts
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      // Ensure we're in the browser
+      const modalOpened = localStorage.getItem('platformFeeModal');
+      setIsModalOpened(!!modalOpened); // Convert to boolean
+      setShowModal(!modalOpened); // Show modal if not previously opened
+    }
+  }, []);
+
   const handleClose = () => {
-    localStorage.setItem('platformFeeModal', 'true');
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('platformFeeModal', 'true');
+    }
     setShowModal(false);
+    setIsModalOpened(true);
   };
   const donationOpportunities = useDonationOpportunities();
 
