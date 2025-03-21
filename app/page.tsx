@@ -180,12 +180,14 @@ export default function Home() {
                 <Link
                   key={opportunity.id.toString()}
                   href={`/opportunities/${opportunity.address}`}
-                  className='bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow'
+                  className='bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow flex flex-col h-full'
                 >
-                  <h3 className='text-xl font-semibold mb-2'>
-                    {opportunity.title}
-                  </h3>
-                  <p className='text-gray-600 mb-4'>{opportunity.summary}</p>
+                  <div className='flex-grow'>
+                    <h3 className='text-xl font-semibold mb-2'>
+                      {opportunity.title}
+                    </h3>
+                    <p className='text-gray-600 mb-4'>{opportunity.summary}</p>
+                  </div>
                   <div className='space-y-2'>
                     <div className='flex justify-between text-sm'>
                       <span className='text-gray-500'>Goal</span>
