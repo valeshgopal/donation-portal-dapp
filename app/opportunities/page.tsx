@@ -16,6 +16,13 @@ export default function OpportunitiesPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
+  const [showModal, setShowModal] = useState(true);
+
+  const isModalOpened = localStorage.getItem('platformFeeModal');
+  const handleClose = () => {
+    localStorage.setItem('platformFeeModal', 'true');
+    setShowModal(false);
+  };
   const donationOpportunities = useDonationOpportunities();
 
   const fetchOpportunities = useCallback(async () => {
@@ -103,7 +110,7 @@ export default function OpportunitiesPage() {
 
   if (isLoading && opportunities.length === 0) {
     return (
-      <div className='container mx-auto px-4 py-8'>
+      <div className='container mx-auto px-4 py-8 relative'>
         <h1 className='text-3xl font-bold mb-8'>Donation Opportunities</h1>
         <div className='animate-pulse space-y-4'>
           {[1, 2, 3].map((i) => (
@@ -162,6 +169,25 @@ export default function OpportunitiesPage() {
           </p>
         </div>
       )}
+
+      {!isLoading &&
+        filteredOpportunities.length > 0 &&
+        showModal &&
+        !isModalOpened && (
+          <div className='fixed bottom-4 bg-green-600 w-3/4 md-w-1/2 left-1/2 transform -translate-x-1/2 p-2 rounded flex items-center justify-between'>
+            <span className='text-sm text-white'>
+              Transparency matters! A 5% platform fee helps us maintain and
+              improve our services, while the remaining 95% of your donation
+              goes directly to the recipient. Your support makes a real impact!
+            </span>
+            <button
+              className='bg-primary text-white px-4 py-1 rounded ml-4 text-xs'
+              onClick={handleClose}
+            >
+              Close
+            </button>
+          </div>
+        )}
     </div>
   );
 }

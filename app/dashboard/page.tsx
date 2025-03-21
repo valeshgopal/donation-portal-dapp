@@ -25,8 +25,9 @@ export default function DashboardPage() {
       try {
         // Get opportunities the user has donated to
         const opportunities =
-          await donationOpportunities.getUserDonatedOpportunities(address);
-        setDonatedOpportunities(opportunities);
+          address &&
+          (await donationOpportunities.getUserDonatedOpportunities(address));
+        setDonatedOpportunities(opportunities ?? []);
       } catch (error) {
         console.error('Error fetching donated opportunities:', error);
       } finally {
@@ -51,6 +52,8 @@ export default function DashboardPage() {
     }
   };
 
+  console.log({ isLoading, donatedOpportunities });
+
   if (isLoading) {
     return (
       <div className='animate-pulse grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 my-12 mx-4'>
@@ -61,7 +64,7 @@ export default function DashboardPage() {
     );
   }
 
-  if (!address) {
+  if (!isLoading && !address) {
     return (
       <div className='container mx-auto px-4 py-16'>
         <div className='text-center'>
@@ -80,7 +83,7 @@ export default function DashboardPage() {
     <div className='container mx-auto px-4 py-8'>
       <h1 className='text-3xl font-bold mb-8'>My Donations</h1>
 
-      {donatedOpportunities.length > 0 ? (
+      {!isLoading && donatedOpportunities.length > 0 ? (
         <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6'>
           {donatedOpportunities.map((opportunity) => (
             <OpportunityCard

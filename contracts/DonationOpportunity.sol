@@ -46,9 +46,6 @@ contract DonationOpportunity is ReentrancyGuard, Ownable, Pausable {
     event FundsWithdrawn(address indexed recipient, uint256 amount);
     event FeeTransferred(address indexed feeRecipient, uint256 amount);
     event FeeRecipientUpdated(address indexed newFeeRecipient);
-    event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
-    event Paused(address account);
-    event Unpaused(address account);
 
     modifier onlyCreator() {
         require(msg.sender == creatorAddress, "Only creator can call this");
@@ -168,7 +165,6 @@ contract DonationOpportunity is ReentrancyGuard, Ownable, Pausable {
     function getDonors() external view returns (address[] memory) {
         uint256 count = donors.length;
         uint256 pageSize = 100;
-        uint256 pages = (count + pageSize - 1) / pageSize; // Ceiling division
         
         // Return only first page or full list if smaller than page size
         uint256 returnSize = count < pageSize ? count : pageSize;

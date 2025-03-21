@@ -8,6 +8,7 @@ import { uploadFileToIPFS } from '../lib/ipfs';
 import { isAddress } from 'viem';
 import { useOpportunityFactory } from '../hooks/useOpportunityFactory';
 import { sepolia } from 'wagmi/chains';
+import Link from 'next/link';
 
 type VerificationDocument = {
   file: File;
@@ -552,11 +553,7 @@ export function CreateOpportunityForm() {
       }
     } catch (error) {
       console.error('Error creating opportunity:', error);
-      setError(
-        error instanceof Error
-          ? `Error: ${error.message}`
-          : 'Failed to create opportunity. Please check the console for details.'
-      );
+      setError('Failed to create opportunity. Please try again.');
     } finally {
       setIsSubmitting(false);
       setCreationStage('idle');
@@ -922,6 +919,19 @@ export function CreateOpportunityForm() {
               {validationErrors.proof}
             </p>
           )}
+        </div>
+        <div>
+          <input
+            type='checkbox'
+            id='terms'
+            name='terms'
+            required
+            onChange={(e) => {}}
+          />
+          <label htmlFor='terms' className='ml-2 text-sm text-gray-600'>
+            I acknowledge that 5% is a platform fee, and I will receive 95% of
+            the donation.
+          </label>
         </div>
       </div>
 

@@ -6,6 +6,10 @@ import { useDonationOpportunities } from './hooks/useDonationOpportunities';
 import { Opportunity } from './lib/contracts/types';
 import { formatEther } from 'viem';
 import Image from 'next/image';
+import { FaXTwitter } from 'react-icons/fa6';
+import { FaFacebookSquare } from 'react-icons/fa';
+import { BsDiscord } from 'react-icons/bs';
+import { FiInstagram } from 'react-icons/fi';
 
 const testimonials = [
   {
@@ -340,25 +344,25 @@ export default function Home() {
                     href='#'
                     className='text-gray-400 hover:text-white text-2xl'
                   >
-                    𝕏
+                    <FaXTwitter />
                   </a>
                   <a
                     href='#'
                     className='text-gray-400 hover:text-white text-2xl'
                   >
-                    📘
+                    <FaFacebookSquare />
                   </a>
                   <a
                     href='#'
                     className='text-gray-400 hover:text-white text-2xl'
                   >
-                    📸
+                    <BsDiscord />
                   </a>
                   <a
                     href='#'
                     className='text-gray-400 hover:text-white text-2xl'
                   >
-                    💼
+                    <FiInstagram />
                   </a>
                 </div>
               </div>
