@@ -9,15 +9,29 @@ import { useAccount } from 'wagmi';
 
 export default function OpportunitiesPage() {
   const { address } = useAccount();
-  const [opportunities, setOpportunities] = useState<Opportunity[]>([]);
+  const {
+    opportunities,
+    isLoading,
+    error: hookError,
+    totalPages,
+    currentPage,
+    setCurrentPage,
+    donate,
+    stopOpportunity,
+  } = useDonationOpportunities();
   const [filteredOpportunities, setFilteredOpportunities] = useState<
     Opportunity[]
   >([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
   const [showModal, setShowModal] = useState(true);
   const [isModalOpened, setIsModalOpened] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Update filtered opportunities when opportunities change
+  useEffect(() => {
+    setFilteredOpportunities(opportunities);
+    setLastRefresh(new Date());
+  }, [opportunities]);
 
   // Check localStorage only after component mounts
   useEffect(() => {
@@ -36,45 +50,35 @@ export default function OpportunitiesPage() {
     setShowModal(false);
     setIsModalOpened(true);
   };
-  const donationOpportunities = useDonationOpportunities();
-
-  const fetchOpportunities = useCallback(async () => {
-    try {
-      setError(null);
-      setIsLoading(true);
-      const opps = await donationOpportunities.getAllOpportunities();
-      setOpportunities(opps);
-      setFilteredOpportunities(opps);
-      setLastRefresh(new Date());
-    } catch (error) {
-      console.error('Error fetching opportunities:', error);
-      setError('Failed to fetch opportunities. Please try again.');
-    } finally {
-      setIsLoading(false);
-    }
-  }, [donationOpportunities.getAllOpportunities]);
-
-  // Initial fetch
-  useEffect(() => {
-    fetchOpportunities();
-  }, [fetchOpportunities]);
 
   const handleFilterChange = useCallback(
     (filters: {
       cause: string;
       location: string;
       status: 'active' | 'inactive' | 'all';
+      search: string;
     }) => {
       let filtered = opportunities;
 
+      // Apply search filter
+      if (filters.search) {
+        const searchLower = filters.search.toLowerCase();
+        filtered = filtered.filter((opp) =>
+          opp.title.toLowerCase().includes(searchLower)
+        );
+      }
+
+      // Apply cause filter
       if (filters.cause) {
         filtered = filtered.filter((opp) => opp.cause.includes(filters.cause));
       }
 
+      // Apply location filter
       if (filters.location) {
         filtered = filtered.filter((opp) => opp.location === filters.location);
       }
 
+      // Apply status filter
       if (filters.status !== 'all') {
         filtered = filtered.filter((opp) => {
           if (filters.status === 'active') return opp.active;
@@ -91,35 +95,49 @@ export default function OpportunitiesPage() {
     async (id: bigint) => {
       try {
         setError(null);
-        await donationOpportunities.stopOpportunity(id);
-        // Refresh opportunities after stopping campaign
-        await fetchOpportunities();
-      } catch (error) {
-        console.error('Error stopping campaign:', error);
+        await stopOpportunity(id);
+      } catch (err) {
+        console.error('Error stopping campaign:', err);
         setError('Failed to stop campaign. Please try again.');
       }
     },
-    [donationOpportunities.stopOpportunity, fetchOpportunities]
+    [stopOpportunity]
   );
 
   const handleDonate = useCallback(
     async (id: bigint, amount: bigint) => {
       try {
         setError(null);
-        await donationOpportunities.donate(id, amount);
-        // Refresh opportunities after donation
-        await fetchOpportunities();
-      } catch (error) {
-        console.error('Error donating:', error);
+        await donate(id, amount);
+      } catch (err) {
+        console.error('Error donating:', err);
         setError('Failed to process donation. Please try again.');
       }
     },
-    [donationOpportunities.donate, fetchOpportunities]
+    [donate]
   );
 
   const handleManualRefresh = useCallback(() => {
-    fetchOpportunities();
-  }, [fetchOpportunities]);
+    setCurrentPage(1); // Reset to first page when manually refreshing
+  }, [setCurrentPage]);
+
+  // Add page input state
+  const [pageInput, setPageInput] = useState(currentPage.toString());
+
+  // Handle direct page navigation
+  const handlePageInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setPageInput(e.target.value);
+  };
+
+  const handlePageSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const page = parseInt(pageInput);
+    if (page >= 1 && page <= totalPages) {
+      setCurrentPage(page);
+    } else {
+      setPageInput(currentPage.toString());
+    }
+  };
 
   if (isLoading && opportunities.length === 0) {
     return (
@@ -138,7 +156,7 @@ export default function OpportunitiesPage() {
     <div className='container mx-auto px-4 py-8'>
       <div className='flex flex-col md:flex-row justify-between items-center mb-8 gap-4'>
         <h1 className='text-2xl md:text-3xl font-bold'>Donation Opportunities</h1>
-        <div className='flex flex-col sm:flex-row items-center gap-4'>
+        {/* <div className='flex flex-col sm:flex-row items-center gap-4'>
           <span className='text-sm text-gray-500'>
             Last updated: {lastRefresh.toLocaleTimeString()}
           </span>
@@ -149,12 +167,12 @@ export default function OpportunitiesPage() {
           >
             {isLoading ? 'Refreshing...' : 'Refresh'}
           </button>
-        </div>
+        </div> */}
       </div>
 
-      {error && (
+      {(error || hookError) && (
         <div className='bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4'>
-          <span className='block sm:inline'>{error}</span>
+          <span className='block sm:inline'>{error || hookError?.message}</span>
         </div>
       )}
 
@@ -174,6 +192,46 @@ export default function OpportunitiesPage() {
           />
         ))}
       </div>
+
+      {/* Pagination Controls */}
+      {totalPages > 1 && (
+        <div className="flex justify-center items-center space-x-2 mt-8">
+          <button
+            onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+            disabled={currentPage <= 1}
+            className="px-4 py-2 bg-primary text-white rounded-md hover:bg-primary/90 disabled:opacity-50"
+          >
+            Previous
+          </button>
+          <form onSubmit={handlePageSubmit} className="flex items-center gap-2">
+            <input
+              type="number"
+              min="1"
+              max={totalPages}
+              value={pageInput}
+              onChange={handlePageInputChange}
+              className="w-16 px-2 py-1 border rounded"
+              aria-label="Go to page"
+            />
+            <button
+              type="submit"
+              className="px-3 py-1 text-sm bg-blue-500 text-white rounded hover:bg-blue-600"
+            >
+              Go
+            </button>
+          </form>
+          <span className="text-gray-600">
+            Page {currentPage} of {totalPages}
+          </span>
+          <button
+            onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
+            disabled={currentPage >= totalPages}
+            className="px-4 py-2 bg-primary text-white rounded-md hover:bg-primary/90 disabled:opacity-50"
+          >
+            Next
+          </button>
+        </div>
+      )}
 
       {!isLoading && filteredOpportunities.length === 0 && !error && (
         <div className='text-center py-12'>

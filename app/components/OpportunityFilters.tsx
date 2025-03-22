@@ -8,6 +8,7 @@ interface FilterProps {
     cause: string;
     location: Country | '';
     status: 'active' | 'inactive' | 'all';
+    search: string;
   }) => void;
   causes: string[];
 }
@@ -21,33 +22,40 @@ export default function OpportunityFilters({
   const [selectedStatus, setSelectedStatus] = useState<
     'active' | 'inactive' | 'all'
   >('all');
+  const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
     onFilterChange({
       cause: selectedCause,
       location: selectedLocation,
       status: selectedStatus,
+      search: searchQuery,
     });
-  }, [selectedCause, selectedLocation, selectedStatus, onFilterChange]);
+  }, [selectedCause, selectedLocation, selectedStatus, searchQuery, onFilterChange]);
 
   return (
-    <div className='flex flex-col gap-4 p-4 bg-white rounded-lg shadow-sm'>
-      <h2 className='text-xl font-semibold mb-2'>Filter Opportunities</h2>
-      <div className='grid grid-cols-1 md:grid-cols-3 gap-4'>
-        <div>
-          <label
-            htmlFor='cause'
-            className='block text-sm font-medium text-gray-700 mb-1'
-          >
-            Cause
-          </label>
+    <div className='bg-white rounded-lg shadow-sm p-4'>
+      <div className='flex items-center gap-4'>
+        {/* Search Bar */}
+        <div className="flex-1">
+          <input
+            type="text"
+            id="search"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search by title..."
+            className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+          />
+        </div>
+
+        {/* Cause Filter */}
+        <div className="w-48">
           <select
-            id='cause'
             value={selectedCause}
             onChange={(e) => setSelectedCause(e.target.value)}
-            className='block w-full rounded-md border border-gray-300 py-2 px-3 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500'
+            className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
           >
-            <option value=''>All Causes</option>
+            <option value="">All Causes</option>
             {causes.map((cause) => (
               <option key={cause} value={cause}>
                 {cause}
@@ -56,22 +64,14 @@ export default function OpportunityFilters({
           </select>
         </div>
 
-        <div>
-          <label
-            htmlFor='location'
-            className='block text-sm font-medium text-gray-700 mb-1'
-          >
-            Location
-          </label>
+        {/* Location Filter */}
+        <div className="w-48">
           <select
-            id='location'
             value={selectedLocation}
-            onChange={(e) =>
-              setSelectedLocation(e.target.value as Country | '')
-            }
-            className='block w-full rounded-md border border-gray-300 py-2 px-3 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500'
+            onChange={(e) => setSelectedLocation(e.target.value as Country | '')}
+            className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
           >
-            <option value=''>All Locations</option>
+            <option value="">All Locations</option>
             {countries.map((country) => (
               <option key={country} value={country}>
                 {country}
@@ -80,24 +80,18 @@ export default function OpportunityFilters({
           </select>
         </div>
 
-        <div>
-          <label
-            htmlFor='status'
-            className='block text-sm font-medium text-gray-700 mb-1'
-          >
-            Status
-          </label>
+        {/* Status Filter */}
+        <div className="w-40">
           <select
-            id='status'
             value={selectedStatus}
             onChange={(e) =>
               setSelectedStatus(e.target.value as 'active' | 'inactive' | 'all')
             }
-            className='block w-full rounded-md border border-gray-300 py-2 px-3 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500'
+            className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
           >
-            <option value='all'>All</option>
-            <option value='active'>Active</option>
-            <option value='inactive'>Inactive</option>
+            <option value="all">All Status</option>
+            <option value="active">Active</option>
+            <option value="inactive">Inactive</option>
           </select>
         </div>
       </div>

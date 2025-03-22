@@ -9,6 +9,7 @@ import { isAddress } from 'viem';
 import { useOpportunityFactory } from '../hooks/useOpportunityFactory';
 import { sepolia } from 'wagmi/chains';
 import Link from 'next/link';
+import toast, { Toaster } from 'react-hot-toast';
 
 type VerificationDocument = {
   file: File;
@@ -329,7 +330,7 @@ export function CreateOpportunityForm() {
         return !value.trim()
           ? 'Recipient wallet address is required'
           : !isAddress(value as `0x${string}`)
-          ? 'Invalid Ethereum address'
+          ? 'Invalid wallet address'
           : undefined;
       default:
         return undefined;
@@ -358,12 +359,12 @@ export function CreateOpportunityForm() {
 
     // Validate KYC documents
     if (!documents.some((d) => d.type === 'kyc')) {
-      errors.kyc = 'At least one KYC document is required';
+      errors.kyc = 'At least one verification document is required';
     }
 
     // Validate Proof documents
     if (!documents.some((d) => d.type === 'proof')) {
-      errors.proof = 'At least one Proof of Work document is required';
+      errors.proof = 'At least one proof document is required';
     }
 
     setValidationErrors(errors);
@@ -416,11 +417,11 @@ export function CreateOpportunityForm() {
       ...prev,
       kyc:
         kycDocs.length === 0
-          ? 'At least one KYC document is required'
+          ? 'At least one verification document is required'
           : undefined,
       proof:
         proofDocs.length === 0
-          ? 'At least one Proof of Work document is required'
+          ? 'At least one proof document is required'
           : undefined,
     }));
   };
@@ -428,71 +429,72 @@ export function CreateOpportunityForm() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!address) {
-      setError('Please connect your wallet first');
+      setError('Please connect your account first');
       return;
     }
 
     if (!validateForm()) {
-      setError('Please fix the errors before submitting');
       return;
     }
 
-    try {
-      setIsSubmitting(true);
-      setError('');
-      setCreationStage('uploading_docs');
+    setIsSubmitting(true);
+    setError('');
 
-      // Validate required fields
+    const toastId = toast.loading('Starting to create your opportunity...');
+
+    try {
+      // Upload documents to IPFS
+      const kycDocs: { ipfsHash: string; fileType: string; type: string }[] = [];
+      const proofDocs: { ipfsHash: string; fileType: string; type: string }[] =
+        [];
+
       if (
         !formData.recipientWallet ||
         !documents.some((d) => d.type === 'kyc') ||
         !documents.some((d) => d.type === 'proof')
       ) {
         throw new Error(
-          'Recipient wallet, KYC document, and Proof of Work document are required'
+          'Recipient wallet, verification document, and proof document are required'
         );
       }
 
-      // Upload documents to IPFS
+      setCreationStage('uploading_docs');
+      toast.loading('Uploading verification documents...', { id: toastId });
+
+      // Upload KYC documents
+      for (const doc of documents.filter((d) => d.type === 'kyc')) {
+        const ipfsHash = await uploadFileToIPFS(doc.file);
+        kycDocs.push({
+          ipfsHash,
+          fileType: doc.file.type,
+          type: 'kyc',
+        });
+        setUploadProgress((prev) => ({
+          ...prev,
+          kyc: prev.kyc + 100 / documents.filter((d) => d.type === 'kyc').length,
+        }));
+      }
+
+      toast.loading('Uploading proof documents...', { id: toastId });
+
+      // Upload Proof documents
+      for (const doc of documents.filter((d) => d.type === 'proof')) {
+        const ipfsHash = await uploadFileToIPFS(doc.file);
+        proofDocs.push({
+          ipfsHash,
+          fileType: doc.file.type,
+          type: 'proof',
+        });
+        setUploadProgress((prev) => ({
+          ...prev,
+          proof:
+            prev.proof + 100 / documents.filter((d) => d.type === 'proof').length,
+        }));
+      }
+
       try {
-        const uploadedDocs = await Promise.all(
-          documents.map(async (doc) => {
-            setUploadProgress((prev) => ({
-              ...prev,
-              [doc.type]: 25,
-            }));
-            try {
-              const ipfsHash = await uploadFileToIPFS(doc.file);
-              setUploadProgress((prev) => ({
-                ...prev,
-                [doc.type]: 100,
-              }));
-              return {
-                ipfsHash,
-                fileType: doc.file.type,
-                type: doc.type,
-              };
-            } catch (uploadError) {
-              setError(`Error uploading document ${doc.file.name}:`);
-              throw new Error(
-                `Failed to upload ${doc.file.name}: ${
-                  uploadError instanceof Error
-                    ? uploadError.message
-                    : 'Unknown error'
-                }`
-              );
-            }
-          })
-        );
-
-        // Reset progress after successful upload
-        setUploadProgress({ kyc: 0, proof: 0 });
-
-        // Separate KYC and proof documents
-        const kycDocs = uploadedDocs.filter((doc) => doc.type === 'kyc');
-        const proofDocs = uploadedDocs.filter((doc) => doc.type === 'proof');
-
         setCreationStage('uploading_metadata');
+        toast.loading('Preparing your opportunity...', { id: toastId });
 
         // Create metadata
         const metadata = {
@@ -512,48 +514,49 @@ export function CreateOpportunityForm() {
         const metadataFile = new File([metadataBlob], 'metadata.json', {
           type: 'application/json',
         });
-        try {
-          const metadataURI = await uploadFileToIPFS(metadataFile);
 
-          setCreationStage('deploying');
+        const metadataURI = await uploadFileToIPFS(metadataFile);
 
-          // Deploy opportunity contract
-          if (!opportunityFactory) {
-            throw new Error('Opportunity factory contract is not initialized');
-          }
+        setCreationStage('deploying');
+        toast.loading('Creating your opportunity...', { id: toastId });
 
-          const tx = await opportunityFactory.createOpportunity(
-            formData.title,
-            formData.fundingGoal,
-            formData.recipientWallet as `0x${string}`,
-            metadataURI
-          );
-
-          setTxHash(tx as `0x${string}`);
-        } catch (metadataError) {
-          setError(`Error uploading metadata: ${metadataError}`);
-          throw new Error(
-            `Failed to upload metadata: ${
-              metadataError instanceof Error
-                ? metadataError.message
-                : 'Unknown error'
-            }`
-          );
+        // Deploy opportunity contract
+        if (!opportunityFactory) {
+          throw new Error('Opportunity factory contract is not initialized');
         }
-      } catch (uploadError) {
-        // Reset progress on error
-        setUploadProgress({ kyc: 0, proof: 0 });
-        setCreationStage('idle');
-        setError(`Error during upload process: ${uploadError}`);
+
+        const tx = await opportunityFactory.createOpportunity(
+          formData.title,
+          formData.fundingGoal,
+          formData.recipientWallet as `0x${string}`,
+          metadataURI
+        );
+
+        setTxHash(tx as `0x${string}`);
+        toast.success('Your opportunity is being created!', { id: toastId });
+
+      } catch (metadataError) {
+        toast.error('Failed to create opportunity. Please try again.', { id: toastId });
+        setError(`Error uploading metadata: ${metadataError}`);
         throw new Error(
-          `Upload failed: ${
-            uploadError instanceof Error ? uploadError.message : 'Unknown error'
+          `Failed to upload metadata: ${
+            metadataError instanceof Error
+              ? metadataError.message
+              : 'Unknown error'
           }`
         );
       }
-    } catch (error) {
-      console.error('Error creating opportunity:', error);
-      setError('Failed to create opportunity. Please try again.');
+    } catch (uploadError) {
+      // Reset progress on error
+      toast.error('Failed to upload documents. Please try again.', { id: toastId });
+      setUploadProgress({ kyc: 0, proof: 0 });
+      setCreationStage('idle');
+      setError(`Error during upload process: ${uploadError}`);
+      throw new Error(
+        `Upload failed: ${
+          uploadError instanceof Error ? uploadError.message : 'Unknown error'
+        }`
+      );
     } finally {
       setIsSubmitting(false);
       setCreationStage('idle');
@@ -576,372 +579,372 @@ export function CreateOpportunityForm() {
   };
 
   useEffect(() => {
-    if (isSuccess) {
-      router.push('/opportunities');
+    if (isSuccess && txHash) {
+      toast.success('Opportunity created successfully!');
+      // Store success message in sessionStorage
+      sessionStorage.setItem('opportunityCreated', formData.title);
+      // Redirect to dashboard
+      router.push('/dashboard');
     }
-  }, [isSuccess, router]);
+  }, [isSuccess, txHash, router, formData.title]);
 
   return (
-    <form onSubmit={handleSubmit} className='space-y-6 max-w-2xl mx-auto'>
-      {error && (
-        <div className='bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-md'>
-          {error}
-        </div>
-      )}
-
-      {txHash && (
-        <div className='bg-blue-50 border border-blue-200 text-blue-600 px-4 py-3 rounded-md'>
-          <p>Transaction submitted! Track your transaction:</p>
-          <a
-            href={getExplorerUrl('tx', txHash)}
-            target='_blank'
-            rel='noopener noreferrer'
-            className='text-primary hover:underline'
-          >
-            View on Etherscan
-          </a>
-        </div>
-      )}
-
-      <div>
-        <label
-          htmlFor='title'
-          className='block text-sm font-medium text-gray-700'
-        >
-          Title<span className='text-xs text-gray-400'>*</span>
-        </label>
-        <input
-          type='text'
-          id='title'
-          value={formData.title}
-          onChange={(e) => handleFieldChange('title', e.target.value)}
-          className={`mt-1 block w-full rounded-md shadow-sm p-3 outline-none focus:ring-primary focus:border-primary ${
-            validationErrors.title ? 'border-red-300' : 'border-gray-300'
-          }`}
-          required
-        />
-        {validationErrors.title && (
-          <p className='mt-1 text-sm text-red-600'>{validationErrors.title}</p>
-        )}
-      </div>
-
-      <div>
-        <label
-          htmlFor='summary'
-          className='block text-sm font-medium text-gray-700'
-        >
-          Summary<span className='text-xs text-gray-400'>*</span>
-        </label>
-        <input
-          type='text'
-          id='summary'
-          value={formData.summary}
-          onChange={(e) => handleFieldChange('summary', e.target.value)}
-          className={`mt-1 block w-full rounded-md shadow-sm p-3 outline-none focus:ring-primary focus:border-primary ${
-            validationErrors.summary ? 'border-red-300' : 'border-gray-300'
-          }`}
-          required
-        />
-        {validationErrors.summary && (
-          <p className='mt-1 text-sm text-red-600'>
-            {validationErrors.summary}
-          </p>
-        )}
-      </div>
-
-      <div>
-        <label
-          htmlFor='description'
-          className='block text-sm font-medium text-gray-700'
-        >
-          Description<span className='text-xs text-gray-400'>*</span>{' '}
-          <span className='text-sm text-gray-500'>(max 1000 words)</span>
-        </label>
-        <textarea
-          id='description'
-          value={formData.description}
-          onChange={(e) => handleFieldChange('description', e.target.value)}
-          placeholder="Explain the impact of your opportunity - describe the problem, your solution, beneficiaries, expected outcomes, timeline, and how you'll ensure transparency."
-          rows={8}
-          className={`mt-1 block w-full rounded-md shadow-sm p-3 outline-none focus:ring-primary focus:border-primary ${
-            validationErrors.description ? 'border-red-300' : 'border-gray-300'
-          }`}
-          required
-        />
-        <div className='mt-1 flex justify-between'>
-          <div>
-            {validationErrors.description && (
-              <p className='text-sm text-red-600'>
-                {validationErrors.description}
-              </p>
-            )}
+    <>
+      <Toaster position="top-right" />
+      <form onSubmit={handleSubmit} className='space-y-6 max-w-2xl mx-auto'>
+        {error && (
+          <div className='bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-md'>
+            {error}
           </div>
-          <div className='text-sm text-gray-500'>
-            {formData.description.trim().split(/\s+/).length} / 1000 words
+        )}
+
+        {txHash && (
+          <div className='bg-blue-50 border border-blue-200 text-blue-600 px-4 py-3 rounded-md'>
+            <p>Your opportunity is being created. You will be redirected to the dashboard shortly.</p>
+            <p className='text-sm mt-1'>Note: It may take a few minutes for your opportunity to appear in the dashboard.</p>
           </div>
-        </div>
-      </div>
-
-      <div>
-        <label
-          htmlFor='location'
-          className='block text-sm font-medium text-gray-700'
-        >
-          Location<span className='text-xs text-gray-400'>*</span>
-        </label>
-        <select
-          id='location'
-          value={formData.location}
-          onChange={(e) => handleFieldChange('location', e.target.value)}
-          className={`mt-1 block w-full rounded-md shadow-sm p-3 outline-none focus:ring-primary focus:border-primary ${
-            validationErrors.location ? 'border-red-300' : 'border-gray-300'
-          }`}
-          required
-        >
-          <option value=''>Select a country</option>
-          {countries.map((country) => (
-            <option key={country} value={country}>
-              {country}
-            </option>
-          ))}
-        </select>
-        {validationErrors.location && (
-          <p className='mt-1 text-sm text-red-600'>
-            {validationErrors.location}
-          </p>
         )}
-      </div>
 
-      <div>
-        <label
-          htmlFor='cause'
-          className='block text-sm font-medium text-gray-700'
-        >
-          Cause<span className='text-xs text-gray-400'>*</span>
-        </label>
-        <select
-          id='cause'
-          value={formData.cause}
-          onChange={(e) => handleFieldChange('cause', e.target.value)}
-          className={`mt-1 block w-full rounded-md shadow-sm p-3 outline-none focus:ring-primary focus:border-primary ${
-            validationErrors.cause ? 'border-red-300' : 'border-gray-300'
-          }`}
-          required
-        >
-          <option value=''>Select a cause</option>
-          {causes.map((cause) => (
-            <option key={cause} value={cause}>
-              {cause}
-            </option>
-          ))}
-        </select>
-        {validationErrors.cause && (
-          <p className='mt-1 text-sm text-red-600'>{validationErrors.cause}</p>
-        )}
-      </div>
-
-      <div>
-        <label
-          htmlFor='fundingGoal'
-          className='block text-sm font-medium text-gray-700'
-        >
-          Funding Goal (ETH)<span className='text-xs text-gray-400'>*</span>
-        </label>
-        <input
-          type='number'
-          id='fundingGoal'
-          value={formData.fundingGoal}
-          onChange={(e) => handleFieldChange('fundingGoal', e.target.value)}
-          step='0.01'
-          min='0'
-          className={`mt-1 block w-full rounded-md shadow-sm p-3 outline-none focus:ring-primary focus:border-primary ${
-            validationErrors.fundingGoal ? 'border-red-300' : 'border-gray-300'
-          }`}
-          required
-        />
-        {validationErrors.fundingGoal && (
-          <p className='mt-1 text-sm text-red-600'>
-            {validationErrors.fundingGoal}
-          </p>
-        )}
-      </div>
-
-      <div>
-        <label
-          htmlFor='recipientWallet'
-          className='block text-sm font-medium text-gray-700'
-        >
-          Recipient Wallet Address
-          <span className='text-xs text-gray-400'>*</span>
-        </label>
-        <input
-          type='text'
-          id='recipientWallet'
-          value={formData.recipientWallet}
-          onChange={(e) => handleFieldChange('recipientWallet', e.target.value)}
-          placeholder='0x...'
-          className={`mt-1 block w-full rounded-md shadow-sm p-3 outline-none focus:ring-primary focus:border-primary ${
-            validationErrors.recipientWallet
-              ? 'border-red-300'
-              : 'border-gray-300'
-          }`}
-          required
-        />
-        {validationErrors.recipientWallet && (
-          <p className='mt-1 text-sm text-red-600'>
-            {validationErrors.recipientWallet}
-          </p>
-        )}
-      </div>
-
-      <div className='space-y-4'>
         <div>
-          <label className='block text-sm font-medium text-gray-700 mb-2'>
-            KYC Verification Documents
-            <span className='text-xs text-gray-400'>*</span>
-            <span className='text-xs text-gray-500 ml-2'>(Max size: 1MB)</span>
+          <label
+            htmlFor='title'
+            className='block text-sm font-medium text-gray-700'
+          >
+            Title<span className='text-xs text-gray-400'>*</span>
           </label>
-          <div className='space-y-4'>
-            <div className='relative'>
-              <input
-                type='file'
-                onChange={(e) => handleDocumentUpload(e, 'kyc')}
-                accept='.pdf,.jpg,.jpeg,.png'
-                className={`block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-primary file:text-white hover:file:bg-primary/90 ${
-                  validationErrors.kyc ? 'border-red-300' : ''
-                }`}
-                required={!documents.some((d) => d.type === 'kyc')}
-              />
-              {documents
-                .filter((d) => d.type === 'kyc')
-                .map((doc, index) => (
-                  <div
-                    key={index}
-                    className='mt-2 flex items-center justify-between bg-gray-50 p-2 rounded-md'
-                  >
-                    <div className='flex-1 flex items-center space-x-2'>
-                      <span className='text-sm text-gray-600'>
-                        {doc.file.name}
-                      </span>
-                      <span className='text-xs text-gray-500'>
-                        ({(doc.file.size / (1024 * 1024)).toFixed(2)}MB)
-                      </span>
-                      {isSubmitting && uploadProgress.kyc > 0 && (
-                        <div className='flex-1 ml-4'>
-                          <div className='w-full bg-gray-200 rounded-full h-1.5'>
-                            <div
-                              className='bg-primary h-1.5 rounded-full transition-all duration-300'
-                              style={{ width: `${uploadProgress.kyc}%` }}
-                            />
-                          </div>
-                          <span className='text-xs text-gray-500 mt-1'>
-                            {uploadProgress.kyc}%
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                    <button
-                      type='button'
-                      onClick={() => removeDocument(index)}
-                      disabled={isSubmitting}
-                      className='text-red-600 hover:text-red-800 text-sm px-2 py-1 rounded-md hover:bg-red-50 disabled:opacity-50'
-                    >
-                      Remove
-                    </button>
-                  </div>
-                ))}
-            </div>
-          </div>
-          {validationErrors.kyc && (
-            <p className='mt-1 text-sm text-red-600'>{validationErrors.kyc}</p>
+          <input
+            type='text'
+            id='title'
+            value={formData.title}
+            onChange={(e) => handleFieldChange('title', e.target.value)}
+            className={`mt-1 block w-full rounded-md shadow-sm p-3 outline-none focus:ring-primary focus:border-primary ${
+              validationErrors.title ? 'border-red-300' : 'border-gray-300'
+            }`}
+            required
+          />
+          {validationErrors.title && (
+            <p className='mt-1 text-sm text-red-600'>{validationErrors.title}</p>
           )}
         </div>
 
         <div>
-          <label className='block text-sm font-medium text-gray-700 mb-2'>
-            Proof of Work Documents
-            <span className='text-xs text-gray-400'>*</span>
-            <span className='text-xs text-gray-500 ml-2'>(Max size: 1MB)</span>
+          <label
+            htmlFor='summary'
+            className='block text-sm font-medium text-gray-700'
+          >
+            Summary<span className='text-xs text-gray-400'>*</span>
           </label>
-          <div className='space-y-4'>
-            <div className='relative'>
-              <input
-                type='file'
-                onChange={(e) => handleDocumentUpload(e, 'proof')}
-                accept='.pdf,.jpg,.jpeg,.png'
-                className={`block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-primary file:text-white hover:file:bg-primary/90 ${
-                  validationErrors.proof ? 'border-red-300' : ''
-                }`}
-                required={!documents.some((d) => d.type === 'proof')}
-              />
-              {documents
-                .filter((d) => d.type === 'proof')
-                .map((doc, index) => (
-                  <div
-                    key={index}
-                    className='mt-2 flex items-center justify-between bg-gray-50 p-2 rounded-md'
-                  >
-                    <div className='flex-1 flex items-center space-x-2'>
-                      <span className='text-sm text-gray-600'>
-                        {doc.file.name}
-                      </span>
-                      <span className='text-xs text-gray-500'>
-                        ({(doc.file.size / (1024 * 1024)).toFixed(2)}MB)
-                      </span>
-                      {isSubmitting && uploadProgress.proof > 0 && (
-                        <div className='flex-1 ml-4'>
-                          <div className='w-full bg-gray-200 rounded-full h-1.5'>
-                            <div
-                              className='bg-primary h-1.5 rounded-full transition-all duration-300'
-                              style={{ width: `${uploadProgress.proof}%` }}
-                            />
-                          </div>
-                          <span className='text-xs text-gray-500 mt-1'>
-                            {uploadProgress.proof}%
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                    <button
-                      type='button'
-                      onClick={() => removeDocument(index)}
-                      disabled={isSubmitting}
-                      className='text-red-600 hover:text-red-800 text-sm px-2 py-1 rounded-md hover:bg-red-50 disabled:opacity-50'
-                    >
-                      Remove
-                    </button>
-                  </div>
-                ))}
-            </div>
-          </div>
-          {validationErrors.proof && (
+          <input
+            type='text'
+            id='summary'
+            value={formData.summary}
+            onChange={(e) => handleFieldChange('summary', e.target.value)}
+            className={`mt-1 block w-full rounded-md shadow-sm p-3 outline-none focus:ring-primary focus:border-primary ${
+              validationErrors.summary ? 'border-red-300' : 'border-gray-300'
+            }`}
+            required
+          />
+          {validationErrors.summary && (
             <p className='mt-1 text-sm text-red-600'>
-              {validationErrors.proof}
+              {validationErrors.summary}
             </p>
           )}
         </div>
-        <div>
-          <input
-            type='checkbox'
-            id='terms'
-            name='terms'
-            required
-            onChange={(e) => {}}
-          />
-          <label htmlFor='terms' className='ml-2 text-sm text-gray-600'>
-            I acknowledge that 5% is a platform fee, and I will receive 95% of
-            the donation.
-          </label>
-        </div>
-      </div>
 
-      <button
-        type='submit'
-        disabled={isSubmitting || !address}
-        className='w-full bg-primary text-white py-2 px-4 rounded-md hover:bg-primary/90 disabled:opacity-50'
-      >
-        {getButtonText()}
-      </button>
-    </form>
+        <div>
+          <label
+            htmlFor='description'
+            className='block text-sm font-medium text-gray-700'
+          >
+            Description<span className='text-xs text-gray-400'>*</span>{' '}
+            <span className='text-sm text-gray-500'>(max 1000 words)</span>
+          </label>
+          <textarea
+            id='description'
+            value={formData.description}
+            onChange={(e) => handleFieldChange('description', e.target.value)}
+            placeholder="Explain the impact of your opportunity - describe the problem, your solution, beneficiaries, expected outcomes, timeline, and how you'll ensure transparency."
+            rows={8}
+            className={`mt-1 block w-full rounded-md shadow-sm p-3 outline-none focus:ring-primary focus:border-primary ${
+              validationErrors.description ? 'border-red-300' : 'border-gray-300'
+            }`}
+            required
+          />
+          <div className='mt-1 flex justify-between'>
+            <div>
+              {validationErrors.description && (
+                <p className='text-sm text-red-600'>
+                  {validationErrors.description}
+                </p>
+              )}
+            </div>
+            <div className='text-sm text-gray-500'>
+              {formData.description.trim().split(/\s+/).length} / 1000 words
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <label
+            htmlFor='location'
+            className='block text-sm font-medium text-gray-700'
+          >
+            Location<span className='text-xs text-gray-400'>*</span>
+          </label>
+          <select
+            id='location'
+            value={formData.location}
+            onChange={(e) => handleFieldChange('location', e.target.value)}
+            className={`mt-1 block w-full rounded-md shadow-sm p-3 outline-none focus:ring-primary focus:border-primary ${
+              validationErrors.location ? 'border-red-300' : 'border-gray-300'
+            }`}
+            required
+          >
+            <option value=''>Select a country</option>
+            {countries.map((country) => (
+              <option key={country} value={country}>
+                {country}
+              </option>
+            ))}
+          </select>
+          {validationErrors.location && (
+            <p className='mt-1 text-sm text-red-600'>
+              {validationErrors.location}
+            </p>
+          )}
+        </div>
+
+        <div>
+          <label
+            htmlFor='cause'
+            className='block text-sm font-medium text-gray-700'
+          >
+            Cause<span className='text-xs text-gray-400'>*</span>
+          </label>
+          <select
+            id='cause'
+            value={formData.cause}
+            onChange={(e) => handleFieldChange('cause', e.target.value)}
+            className={`mt-1 block w-full rounded-md shadow-sm p-3 outline-none focus:ring-primary focus:border-primary ${
+              validationErrors.cause ? 'border-red-300' : 'border-gray-300'
+            }`}
+            required
+          >
+            <option value=''>Select a cause</option>
+            {causes.map((cause) => (
+              <option key={cause} value={cause}>
+                {cause}
+              </option>
+            ))}
+          </select>
+          {validationErrors.cause && (
+            <p className='mt-1 text-sm text-red-600'>{validationErrors.cause}</p>
+          )}
+        </div>
+
+        <div>
+          <label
+            htmlFor='fundingGoal'
+            className='block text-sm font-medium text-gray-700'
+          >
+            Funding Goal<span className='text-xs text-gray-400'>*</span>
+          </label>
+          <input
+            type='number'
+            id='fundingGoal'
+            value={formData.fundingGoal}
+            onChange={(e) => handleFieldChange('fundingGoal', e.target.value)}
+            step='0.01'
+            min='0'
+            className={`mt-1 block w-full rounded-md shadow-sm p-3 outline-none focus:ring-primary focus:border-primary ${
+              validationErrors.fundingGoal ? 'border-red-300' : 'border-gray-300'
+            }`}
+            required
+          />
+          {validationErrors.fundingGoal && (
+            <p className='mt-1 text-sm text-red-600'>
+              {validationErrors.fundingGoal}
+            </p>
+          )}
+        </div>
+
+        <div>
+          <label
+            htmlFor='recipientWallet'
+            className='block text-sm font-medium text-gray-700'
+          >
+            Recipient Wallet Address
+            <span className='text-xs text-gray-400'>*</span>
+          </label>
+          <input
+            type='text'
+            id='recipientWallet'
+            value={formData.recipientWallet}
+            onChange={(e) => handleFieldChange('recipientWallet', e.target.value)}
+            placeholder='Wallet address'
+            className={`mt-1 block w-full rounded-md shadow-sm p-3 outline-none focus:ring-primary focus:border-primary ${
+              validationErrors.recipientWallet
+                ? 'border-red-300'
+                : 'border-gray-300'
+            }`}
+            required
+          />
+          {validationErrors.recipientWallet && (
+            <p className='mt-1 text-sm text-red-600'>
+              {validationErrors.recipientWallet}
+            </p>
+          )}
+        </div>
+
+        <div className='space-y-4'>
+          <div>
+            <label className='block text-sm font-medium text-gray-700 mb-2'>
+              Verification Documents
+              <span className='text-xs text-gray-400'>*</span>
+              <span className='text-xs text-gray-500 ml-2'>(Max size: 1MB)</span>
+            </label>
+            <div className='space-y-4'>
+              <div className='relative'>
+                <input
+                  type='file'
+                  onChange={(e) => handleDocumentUpload(e, 'kyc')}
+                  accept='.pdf,.jpg,.jpeg,.png'
+                  className={`block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-primary file:text-white hover:file:bg-primary/90 ${
+                    validationErrors.kyc ? 'border-red-300' : ''
+                  }`}
+                  required={!documents.some((d) => d.type === 'kyc')}
+                />
+                {documents
+                  .filter((d) => d.type === 'kyc')
+                  .map((doc, index) => (
+                    <div
+                      key={index}
+                      className='mt-2 flex items-center justify-between bg-gray-50 p-2 rounded-md'
+                    >
+                      <div className='flex-1 flex items-center space-x-2'>
+                        <span className='text-sm text-gray-600'>
+                          {doc.file.name}
+                        </span>
+                        <span className='text-xs text-gray-500'>
+                          ({(doc.file.size / (1024 * 1024)).toFixed(2)}MB)
+                        </span>
+                        {isSubmitting && uploadProgress.kyc > 0 && (
+                          <div className='flex-1 ml-4'>
+                            <div className='w-full bg-gray-200 rounded-full h-1.5'>
+                              <div
+                                className='bg-primary h-1.5 rounded-full transition-all duration-300'
+                                style={{ width: `${uploadProgress.kyc}%` }}
+                              />
+                            </div>
+                            <span className='text-xs text-gray-500 mt-1'>
+                              {uploadProgress.kyc}%
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                      <button
+                        type='button'
+                        onClick={() => removeDocument(index)}
+                        disabled={isSubmitting}
+                        className='text-red-600 hover:text-red-800 text-sm px-2 py-1 rounded-md hover:bg-red-50 disabled:opacity-50'
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  ))}
+              </div>
+            </div>
+            {validationErrors.kyc && (
+              <p className='mt-1 text-sm text-red-600'>{validationErrors.kyc}</p>
+            )}
+          </div>
+
+          <div>
+            <label className='block text-sm font-medium text-gray-700 mb-2'>
+              Proof Documents
+              <span className='text-xs text-gray-400'>*</span>
+              <span className='text-xs text-gray-500 ml-2'>(Max size: 1MB)</span>
+            </label>
+            <div className='space-y-4'>
+              <div className='relative'>
+                <input
+                  type='file'
+                  onChange={(e) => handleDocumentUpload(e, 'proof')}
+                  accept='.pdf,.jpg,.jpeg,.png'
+                  className={`block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-primary file:text-white hover:file:bg-primary/90 ${
+                    validationErrors.proof ? 'border-red-300' : ''
+                  }`}
+                  required={!documents.some((d) => d.type === 'proof')}
+                />
+                {documents
+                  .filter((d) => d.type === 'proof')
+                  .map((doc, index) => (
+                    <div
+                      key={index}
+                      className='mt-2 flex items-center justify-between bg-gray-50 p-2 rounded-md'
+                    >
+                      <div className='flex-1 flex items-center space-x-2'>
+                        <span className='text-sm text-gray-600'>
+                          {doc.file.name}
+                        </span>
+                        <span className='text-xs text-gray-500'>
+                          ({(doc.file.size / (1024 * 1024)).toFixed(2)}MB)
+                        </span>
+                        {isSubmitting && uploadProgress.proof > 0 && (
+                          <div className='flex-1 ml-4'>
+                            <div className='w-full bg-gray-200 rounded-full h-1.5'>
+                              <div
+                                className='bg-primary h-1.5 rounded-full transition-all duration-300'
+                                style={{ width: `${uploadProgress.proof}%` }}
+                              />
+                            </div>
+                            <span className='text-xs text-gray-500 mt-1'>
+                              {uploadProgress.proof}%
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                      <button
+                        type='button'
+                        onClick={() => removeDocument(index)}
+                        disabled={isSubmitting}
+                        className='text-red-600 hover:text-red-800 text-sm px-2 py-1 rounded-md hover:bg-red-50 disabled:opacity-50'
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  ))}
+              </div>
+            </div>
+            {validationErrors.proof && (
+              <p className='mt-1 text-sm text-red-600'>
+                {validationErrors.proof}
+              </p>
+            )}
+          </div>
+          <div>
+            <input
+              type='checkbox'
+              id='terms'
+              name='terms'
+              required
+              onChange={(e) => {}}
+            />
+            <label htmlFor='terms' className='ml-2 text-sm text-gray-600'>
+              I acknowledge that 5% is a platform fee, and I will receive 95% of
+              the donation.
+            </label>
+          </div>
+        </div>
+
+        <button
+          type='submit'
+          disabled={isSubmitting || !address}
+          className='w-full bg-primary text-white py-2 px-4 rounded-md hover:bg-primary/90 disabled:opacity-50'
+        >
+          {getButtonText()}
+        </button>
+      </form>
+    </>
   );
 }

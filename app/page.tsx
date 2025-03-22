@@ -203,7 +203,7 @@ export default function Home() {
                     </div>
                     <div className='w-full bg-gray-200 rounded-full h-2'>
                       <div
-                        className='bg-gradient-to-r from-green-400 to-green-600 transition-all duration-300 ease-in-out h-2 rounded-full'
+                        className='bg-gradient-to-r from-green-500 to-green-400 transition-all duration-300 ease-in-out h-2 rounded-full'
                         style={{
                           width: `${Math.min(
                             (Number(opportunity.currentRaised) /

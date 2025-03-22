@@ -28,26 +28,18 @@ type OpportunityMetadata = {
   proofs: Array<{ ipfsHash: string; fileType: string; type: string }>;
 };
 
-export type DonationOpportunity = {
-  id: bigint;
-  address: `0x${string}`;
-  title: string;
-  fundingGoal: bigint;
-  currentRaised: bigint;
-  recipientWallet: `0x${string}`;
-  creatorAddress: `0x${string}`;
-  metadataURI: string;
-  active: boolean;
-  createdAt: bigint;
-  donorCount: bigint;
-  metadata?: OpportunityMetadata;
-};
+
+const PAGE_SIZE = 9; // Number of opportunities per page
 
 // Define the return type for the hook
 interface DonationOpportunitiesHook {
-  opportunities: DonationOpportunity[];
+  opportunities: Opportunity[];
   isLoading: boolean;
   error: Error | null;
+  totalPages: number;
+  currentPage: number;
+  setCurrentPage: (page: number) => void;
+  getOpportunitiesPaginated: (page: number) => Promise<{ opportunities: Opportunity[]; totalCount: number }>;
   createOpportunity: (
     title: string,
     summary: string,
@@ -87,21 +79,15 @@ const fetchMetadata = async (
 };
 
 export function useDonationOpportunities(): DonationOpportunitiesHook {
-  const [opportunities, setOpportunities] = useState<DonationOpportunity[]>([]);
+  const [opportunities, setOpportunities] = useState<Opportunity[]>([]);
+  const [allOpportunities, setAllOpportunities] = useState<Opportunity[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
+  const [totalPages, setTotalPages] = useState(1);
+  const [currentPage, setCurrentPage] = useState(1);
   const publicClient = usePublicClient();
-  const { address: userAddress } = useAccount();
 
-  // Get all opportunity addresses from factory
-  const { data: opportunityAddresses = [], refetch: refetchAddresses } =
-    useReadContract({
-      address: FACTORY_ADDRESS,
-      abi: opportunityFactoryABI,
-      functionName: 'getOpportunities',
-    });
-
-  // Fetch opportunity details
+  // Fetch opportunity details helper function
   const fetchOpportunityDetails = async (
     opportunityAddress: `0x${string}`,
     client: PublicClient,
@@ -148,7 +134,7 @@ export function useDonationOpportunities(): DonationOpportunitiesHook {
         active,
         createdAt,
         donorCount,
-        metadata,
+        metadata
       };
     } catch (err) {
       console.error(
@@ -159,40 +145,86 @@ export function useDonationOpportunities(): DonationOpportunitiesHook {
     }
   };
 
-  // Fetch all opportunities
+  // Fetch all opportunities once
   useEffect(() => {
-    const fetchOpportunities = async () => {
+    const fetchAllOpportunities = async () => {
       if (!publicClient) return;
 
-      setIsLoading(true);
-      setError(null);
-
       try {
-        const details = await Promise.all(
-          (opportunityAddresses as `0x${string}`[]).map((address, index) =>
-            fetchOpportunityDetails(address, publicClient, index).then(
-              (details) => ({
-                ...details,
-                metadata: details.metadata || undefined, // Convert null to undefined
-              })
-            )
-          )
+        setIsLoading(true);
+        setError(null);
+
+        const allAddresses = await publicClient.readContract({
+          address: FACTORY_ADDRESS,
+          abi: opportunityFactoryABI,
+          functionName: 'getOpportunities',
+        }) as `0x${string}`[];
+
+        const opportunitiesData = await Promise.all(
+          allAddresses.map(async (address, idx) => {
+            const details = await fetchOpportunityDetails(address, publicClient, idx);
+            return {
+              id: details.id,
+              address: details.address,
+              title: details.title,
+              summary: details.metadata?.summary || '',
+              description: details.metadata?.description || '',
+              location: details.metadata?.location || '',
+              cause: details.metadata?.cause ? [details.metadata.cause] : [],
+              fundingGoal: details.fundingGoal,
+              currentRaised: details.currentRaised,
+              walletAddress: details.recipientWallet,
+              createdAt: details.createdAt,
+              active: details.active,
+              creatorAddress: details.creatorAddress,
+              metadataURI: details.metadataURI,
+              donorCount: details.donorCount,
+              totalUserDonation: 0
+            };
+          })
         );
-        setOpportunities(details);
-      } catch (err) {
-        console.error('Error fetching opportunities:', err);
-        setError(
-          err instanceof Error
-            ? err
-            : new Error('Failed to fetch opportunities')
-        );
+
+        setAllOpportunities(opportunitiesData);
+        setTotalPages(Math.max(1, Math.ceil(opportunitiesData.length / PAGE_SIZE)));
+      } catch (error) {
+        console.error('Error fetching opportunities:', error);
+        const errInstance = error instanceof Error ? error : new Error('Unknown error');
+        setError(errInstance);
       } finally {
         setIsLoading(false);
       }
     };
 
-    fetchOpportunities();
-  }, [opportunityAddresses, publicClient]);
+    fetchAllOpportunities();
+  }, [publicClient]);
+
+  // Handle pagination in memory
+  useEffect(() => {
+    if (allOpportunities.length > 0) {
+      const startIndex = (currentPage - 1) * PAGE_SIZE;
+      const endIndex = startIndex + PAGE_SIZE;
+      setOpportunities(allOpportunities.slice(startIndex, endIndex));
+    }
+  }, [currentPage, allOpportunities]);
+
+  // Ensure currentPage stays within valid bounds
+  useEffect(() => {
+    if (currentPage < 1) {
+      setCurrentPage(1);
+    } else if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
+
+  const getOpportunitiesPaginated = useCallback(
+    async (page: number) => {
+      const startIndex = (page - 1) * PAGE_SIZE;
+      const endIndex = startIndex + PAGE_SIZE;
+      const pageOpportunities = allOpportunities.slice(startIndex, endIndex);
+      return { opportunities: pageOpportunities, totalCount: allOpportunities.length };
+    },
+    [allOpportunities]
+  );
 
   // Write contract functions
   const { writeContractAsync: writeCreateOpportunity } = useWriteContract();
@@ -222,7 +254,7 @@ export function useDonationOpportunities(): DonationOpportunitiesHook {
       const receipt = await publicClient.waitForTransactionReceipt({
         hash,
       });
-      await refetchAddresses();
+      await refetch();
 
       // Return the opportunity ID (index in the array)
       const addresses = await publicClient.readContract({
@@ -261,7 +293,7 @@ export function useDonationOpportunities(): DonationOpportunitiesHook {
       await publicClient.waitForTransactionReceipt({
         hash,
       });
-      await refetchAddresses();
+      await refetch();
     } catch (err) {
       console.error('Error donating:', err);
       throw err;
@@ -292,7 +324,7 @@ export function useDonationOpportunities(): DonationOpportunitiesHook {
         hash,
         timeout: 60_000,
       });
-      await refetchAddresses();
+      await refetch();
     } catch (err) {
       console.error('Error stopping opportunity:', err);
       throw err;
@@ -544,35 +576,90 @@ export function useDonationOpportunities(): DonationOpportunitiesHook {
     // Map to Opportunity type
     return Promise.all(
       featuredOpportunities.map(async (opp) => {
-        const details = await fetchOpportunityDetails(
-          opp.address,
-          publicClient,
-          Number(opp.id)
-        );
+        const metadata = await fetchMetadata(opp.metadataURI);
         return {
-          id: BigInt(parseInt(opp.address.slice(2), 16)), // Convert address to BigInt
+          id: opp.id,
           address: opp.address,
-          title: details.title,
-          summary: details.metadata?.summary || '',
-          description: details.metadata?.description || '',
-          location: details.metadata?.location || '',
-          cause: details.metadata?.cause ? [details.metadata.cause] : [],
-          fundingGoal: details.fundingGoal,
-          currentRaised: details.currentRaised,
-          walletAddress: details.recipientWallet,
-          createdAt: details.createdAt,
-          active: details.active,
-          creatorAddress: details.creatorAddress,
-          metadataURI: details.metadataURI,
-        } as Opportunity;
+          title: opp.title,
+          summary: metadata?.summary || '',
+          description: metadata?.description || '',
+          location: metadata?.location || '',
+          cause: metadata?.cause ? [metadata.cause] : [],
+          fundingGoal: opp.fundingGoal,
+          currentRaised: opp.currentRaised,
+          walletAddress: opp.walletAddress,
+          createdAt: opp.createdAt,
+          active: opp.active,
+          creatorAddress: opp.creatorAddress,
+          metadataURI: opp.metadataURI,
+          donorCount: opp.donorCount,
+          totalUserDonation: 0
+        };
       })
     );
   }, [opportunities, publicClient]);
+
+  // Refetch all opportunities
+  const refetch = useCallback(async () => {
+    const fetchAllOpportunities = async () => {
+      if (!publicClient) return;
+
+      try {
+        setIsLoading(true);
+        setError(null);
+
+        const allAddresses = await publicClient.readContract({
+          address: FACTORY_ADDRESS,
+          abi: opportunityFactoryABI,
+          functionName: 'getOpportunities',
+        }) as `0x${string}`[];
+
+        const opportunitiesData = await Promise.all(
+          allAddresses.map(async (address, idx) => {
+            const details = await fetchOpportunityDetails(address, publicClient, idx);
+            return {
+              id: details.id,
+              address: details.address,
+              title: details.title,
+              summary: details.metadata?.summary || '',
+              description: details.metadata?.description || '',
+              location: details.metadata?.location || '',
+              cause: details.metadata?.cause ? [details.metadata.cause] : [],
+              fundingGoal: details.fundingGoal,
+              currentRaised: details.currentRaised,
+              walletAddress: details.recipientWallet,
+              createdAt: details.createdAt,
+              active: details.active,
+              creatorAddress: details.creatorAddress,
+              metadataURI: details.metadataURI,
+              donorCount: details.donorCount,
+              totalUserDonation: 0
+            };
+          })
+        );
+
+        setAllOpportunities(opportunitiesData);
+        setTotalPages(Math.max(1, Math.ceil(opportunitiesData.length / PAGE_SIZE)));
+      } catch (error) {
+        console.error('Error fetching opportunities:', error);
+        const errInstance = error instanceof Error ? error : new Error('Unknown error');
+        setError(errInstance);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    await fetchAllOpportunities();
+  }, [publicClient]);
 
   return {
     opportunities,
     isLoading,
     error,
+    totalPages,
+    currentPage,
+    setCurrentPage,
+    getOpportunitiesPaginated,
     createOpportunity,
     donate,
     getActiveOpportunities,
@@ -582,6 +669,6 @@ export function useDonationOpportunities(): DonationOpportunitiesHook {
     getUserDonatedOpportunities,
     getUserDonationsForOpportunity,
     getFeaturedOpportunities,
-    refetch: refetchAddresses,
+    refetch,
   };
 }
