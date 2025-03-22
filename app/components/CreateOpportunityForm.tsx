@@ -444,7 +444,8 @@ export function CreateOpportunityForm() {
 
     try {
       // Upload documents to IPFS
-      const kycDocs: { ipfsHash: string; fileType: string; type: string }[] = [];
+      const kycDocs: { ipfsHash: string; fileType: string; type: string }[] =
+        [];
       const proofDocs: { ipfsHash: string; fileType: string; type: string }[] =
         [];
 
@@ -471,7 +472,8 @@ export function CreateOpportunityForm() {
         });
         setUploadProgress((prev) => ({
           ...prev,
-          kyc: prev.kyc + 100 / documents.filter((d) => d.type === 'kyc').length,
+          kyc:
+            prev.kyc + 100 / documents.filter((d) => d.type === 'kyc').length,
         }));
       }
 
@@ -488,7 +490,8 @@ export function CreateOpportunityForm() {
         setUploadProgress((prev) => ({
           ...prev,
           proof:
-            prev.proof + 100 / documents.filter((d) => d.type === 'proof').length,
+            prev.proof +
+            100 / documents.filter((d) => d.type === 'proof').length,
         }));
       }
 
@@ -533,10 +536,10 @@ export function CreateOpportunityForm() {
         );
 
         setTxHash(tx as `0x${string}`);
-        toast.success('Your opportunity is being created!', { id: toastId });
-
       } catch (metadataError) {
-        toast.error('Failed to create opportunity. Please try again.', { id: toastId });
+        toast.error('Failed to create opportunity. Please try again.', {
+          id: toastId,
+        });
         setError(`Error uploading metadata: ${metadataError}`);
         throw new Error(
           `Failed to upload metadata: ${
@@ -548,7 +551,9 @@ export function CreateOpportunityForm() {
       }
     } catch (uploadError) {
       // Reset progress on error
-      toast.error('Failed to upload documents. Please try again.', { id: toastId });
+      toast.error('Failed to upload documents. Please try again.', {
+        id: toastId,
+      });
       setUploadProgress({ kyc: 0, proof: 0 });
       setCreationStage('idle');
       setError(`Error during upload process: ${uploadError}`);
@@ -590,7 +595,7 @@ export function CreateOpportunityForm() {
 
   return (
     <>
-      <Toaster position="top-right" />
+      <Toaster position='top-right' />
       <form onSubmit={handleSubmit} className='space-y-6 max-w-2xl mx-auto'>
         {error && (
           <div className='bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-md'>
@@ -600,8 +605,14 @@ export function CreateOpportunityForm() {
 
         {txHash && (
           <div className='bg-blue-50 border border-blue-200 text-blue-600 px-4 py-3 rounded-md'>
-            <p>Your opportunity is being created. You will be redirected to the dashboard shortly.</p>
-            <p className='text-sm mt-1'>Note: It may take a few minutes for your opportunity to appear in the dashboard.</p>
+            <p>
+              Your opportunity is being created. You will be redirected to the
+              dashboard shortly.
+            </p>
+            <p className='text-sm mt-1'>
+              Note: It may take a few minutes for your opportunity to appear in
+              the dashboard.
+            </p>
           </div>
         )}
 
@@ -623,7 +634,9 @@ export function CreateOpportunityForm() {
             required
           />
           {validationErrors.title && (
-            <p className='mt-1 text-sm text-red-600'>{validationErrors.title}</p>
+            <p className='mt-1 text-sm text-red-600'>
+              {validationErrors.title}
+            </p>
           )}
         </div>
 
@@ -666,7 +679,9 @@ export function CreateOpportunityForm() {
             placeholder="Explain the impact of your opportunity - describe the problem, your solution, beneficiaries, expected outcomes, timeline, and how you'll ensure transparency."
             rows={8}
             className={`mt-1 block w-full rounded-md shadow-sm p-3 outline-none focus:ring-primary focus:border-primary ${
-              validationErrors.description ? 'border-red-300' : 'border-gray-300'
+              validationErrors.description
+                ? 'border-red-300'
+                : 'border-gray-300'
             }`}
             required
           />
@@ -738,7 +753,9 @@ export function CreateOpportunityForm() {
             ))}
           </select>
           {validationErrors.cause && (
-            <p className='mt-1 text-sm text-red-600'>{validationErrors.cause}</p>
+            <p className='mt-1 text-sm text-red-600'>
+              {validationErrors.cause}
+            </p>
           )}
         </div>
 
@@ -757,7 +774,9 @@ export function CreateOpportunityForm() {
             step='0.01'
             min='0'
             className={`mt-1 block w-full rounded-md shadow-sm p-3 outline-none focus:ring-primary focus:border-primary ${
-              validationErrors.fundingGoal ? 'border-red-300' : 'border-gray-300'
+              validationErrors.fundingGoal
+                ? 'border-red-300'
+                : 'border-gray-300'
             }`}
             required
           />
@@ -780,7 +799,9 @@ export function CreateOpportunityForm() {
             type='text'
             id='recipientWallet'
             value={formData.recipientWallet}
-            onChange={(e) => handleFieldChange('recipientWallet', e.target.value)}
+            onChange={(e) =>
+              handleFieldChange('recipientWallet', e.target.value)
+            }
             placeholder='Wallet address'
             className={`mt-1 block w-full rounded-md shadow-sm p-3 outline-none focus:ring-primary focus:border-primary ${
               validationErrors.recipientWallet
@@ -801,7 +822,9 @@ export function CreateOpportunityForm() {
             <label className='block text-sm font-medium text-gray-700 mb-2'>
               Verification Documents
               <span className='text-xs text-gray-400'>*</span>
-              <span className='text-xs text-gray-500 ml-2'>(Max size: 1MB)</span>
+              <span className='text-xs text-gray-500 ml-2'>
+                (Max size: 1MB)
+              </span>
             </label>
             <div className='space-y-4'>
               <div className='relative'>
@@ -855,7 +878,9 @@ export function CreateOpportunityForm() {
               </div>
             </div>
             {validationErrors.kyc && (
-              <p className='mt-1 text-sm text-red-600'>{validationErrors.kyc}</p>
+              <p className='mt-1 text-sm text-red-600'>
+                {validationErrors.kyc}
+              </p>
             )}
           </div>
 
@@ -863,7 +888,9 @@ export function CreateOpportunityForm() {
             <label className='block text-sm font-medium text-gray-700 mb-2'>
               Proof Documents
               <span className='text-xs text-gray-400'>*</span>
-              <span className='text-xs text-gray-500 ml-2'>(Max size: 1MB)</span>
+              <span className='text-xs text-gray-500 ml-2'>
+                (Max size: 1MB)
+              </span>
             </label>
             <div className='space-y-4'>
               <div className='relative'>
