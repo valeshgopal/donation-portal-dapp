@@ -28,7 +28,6 @@ type OpportunityMetadata = {
   proofs: Array<{ ipfsHash: string; fileType: string; type: string }>;
 };
 
-
 const PAGE_SIZE = 9; // Number of opportunities per page
 
 // Define the return type for the hook
@@ -39,7 +38,9 @@ interface DonationOpportunitiesHook {
   totalPages: number;
   currentPage: number;
   setCurrentPage: (page: number) => void;
-  getOpportunitiesPaginated: (page: number) => Promise<{ opportunities: Opportunity[]; totalCount: number }>;
+  getOpportunitiesPaginated: (
+    page: number
+  ) => Promise<{ opportunities: Opportunity[]; totalCount: number }>;
   createOpportunity: (
     title: string,
     summary: string,
@@ -52,6 +53,7 @@ interface DonationOpportunitiesHook {
   ) => Promise<bigint>;
   donate: (id: bigint, value: bigint) => Promise<void>;
   getActiveOpportunities: DonationOpportunitiesContract['getActiveOpportunities'];
+  allOpportunities: Opportunity[];
   getAllOpportunities: DonationOpportunitiesContract['getAllOpportunities'];
   getOpportunity: DonationOpportunitiesContract['getOpportunity'];
   stopOpportunity: (id: bigint) => Promise<void>;
@@ -134,7 +136,7 @@ export function useDonationOpportunities(): DonationOpportunitiesHook {
         active,
         createdAt,
         donorCount,
-        metadata
+        metadata,
       };
     } catch (err) {
       console.error(
@@ -154,15 +156,19 @@ export function useDonationOpportunities(): DonationOpportunitiesHook {
         setIsLoading(true);
         setError(null);
 
-        const allAddresses = await publicClient.readContract({
+        const allAddresses = (await publicClient.readContract({
           address: FACTORY_ADDRESS,
           abi: opportunityFactoryABI,
           functionName: 'getOpportunities',
-        }) as `0x${string}`[];
+        })) as `0x${string}`[];
 
         const opportunitiesData = await Promise.all(
           allAddresses.map(async (address, idx) => {
-            const details = await fetchOpportunityDetails(address, publicClient, idx);
+            const details = await fetchOpportunityDetails(
+              address,
+              publicClient,
+              idx
+            );
             return {
               id: details.id,
               address: details.address,
@@ -179,16 +185,19 @@ export function useDonationOpportunities(): DonationOpportunitiesHook {
               creatorAddress: details.creatorAddress,
               metadataURI: details.metadataURI,
               donorCount: details.donorCount,
-              totalUserDonation: 0
+              totalUserDonation: 0,
             };
           })
         );
 
         setAllOpportunities(opportunitiesData);
-        setTotalPages(Math.max(1, Math.ceil(opportunitiesData.length / PAGE_SIZE)));
+        setTotalPages(
+          Math.max(1, Math.ceil(opportunitiesData.length / PAGE_SIZE))
+        );
       } catch (error) {
         console.error('Error fetching opportunities:', error);
-        const errInstance = error instanceof Error ? error : new Error('Unknown error');
+        const errInstance =
+          error instanceof Error ? error : new Error('Unknown error');
         setError(errInstance);
       } finally {
         setIsLoading(false);
@@ -221,7 +230,10 @@ export function useDonationOpportunities(): DonationOpportunitiesHook {
       const startIndex = (page - 1) * PAGE_SIZE;
       const endIndex = startIndex + PAGE_SIZE;
       const pageOpportunities = allOpportunities.slice(startIndex, endIndex);
-      return { opportunities: pageOpportunities, totalCount: allOpportunities.length };
+      return {
+        opportunities: pageOpportunities,
+        totalCount: allOpportunities.length,
+      };
     },
     [allOpportunities]
   );
@@ -593,7 +605,7 @@ export function useDonationOpportunities(): DonationOpportunitiesHook {
           creatorAddress: opp.creatorAddress,
           metadataURI: opp.metadataURI,
           donorCount: opp.donorCount,
-          totalUserDonation: 0
+          totalUserDonation: 0,
         };
       })
     );
@@ -608,15 +620,19 @@ export function useDonationOpportunities(): DonationOpportunitiesHook {
         setIsLoading(true);
         setError(null);
 
-        const allAddresses = await publicClient.readContract({
+        const allAddresses = (await publicClient.readContract({
           address: FACTORY_ADDRESS,
           abi: opportunityFactoryABI,
           functionName: 'getOpportunities',
-        }) as `0x${string}`[];
+        })) as `0x${string}`[];
 
         const opportunitiesData = await Promise.all(
           allAddresses.map(async (address, idx) => {
-            const details = await fetchOpportunityDetails(address, publicClient, idx);
+            const details = await fetchOpportunityDetails(
+              address,
+              publicClient,
+              idx
+            );
             return {
               id: details.id,
               address: details.address,
@@ -633,16 +649,19 @@ export function useDonationOpportunities(): DonationOpportunitiesHook {
               creatorAddress: details.creatorAddress,
               metadataURI: details.metadataURI,
               donorCount: details.donorCount,
-              totalUserDonation: 0
+              totalUserDonation: 0,
             };
           })
         );
 
         setAllOpportunities(opportunitiesData);
-        setTotalPages(Math.max(1, Math.ceil(opportunitiesData.length / PAGE_SIZE)));
+        setTotalPages(
+          Math.max(1, Math.ceil(opportunitiesData.length / PAGE_SIZE))
+        );
       } catch (error) {
         console.error('Error fetching opportunities:', error);
-        const errInstance = error instanceof Error ? error : new Error('Unknown error');
+        const errInstance =
+          error instanceof Error ? error : new Error('Unknown error');
         setError(errInstance);
       } finally {
         setIsLoading(false);
@@ -663,6 +682,7 @@ export function useDonationOpportunities(): DonationOpportunitiesHook {
     createOpportunity,
     donate,
     getActiveOpportunities,
+    allOpportunities,
     getAllOpportunities,
     getOpportunity,
     stopOpportunity,

@@ -12,8 +12,12 @@ type TabType = 'created' | 'donated';
 export default function DashboardPage() {
   const { address } = useAccount();
   const [activeTab, setActiveTab] = useState<TabType>('created');
-  const [donatedOpportunities, setDonatedOpportunities] = useState<Opportunity[]>([]);
-  const [createdOpportunities, setCreatedOpportunities] = useState<Opportunity[]>([]);
+  const [donatedOpportunities, setDonatedOpportunities] = useState<
+    Opportunity[]
+  >([]);
+  const [createdOpportunities, setCreatedOpportunities] = useState<
+    Opportunity[]
+  >([]);
   const [isLoading, setIsLoading] = useState(true);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const donationOpportunities = useDonationOpportunities();
@@ -28,7 +32,9 @@ export default function DashboardPage() {
     // Check for success message in sessionStorage
     const createdOpportunity = sessionStorage.getItem('opportunityCreated');
     if (createdOpportunity) {
-      setSuccessMessage(`"${createdOpportunity}" has been created successfully! It may take a few minutes to appear in your dashboard.`);
+      setSuccessMessage(
+        `"${createdOpportunity}" has been created successfully! It may take a few minutes to appear in your dashboard.`
+      );
       sessionStorage.removeItem('opportunityCreated');
     }
   }, []);
@@ -39,7 +45,8 @@ export default function DashboardPage() {
   }, [activeTab]);
 
   useEffect(() => {
-    const opportunities = activeTab === 'created' ? createdOpportunities : donatedOpportunities;
+    const opportunities =
+      activeTab === 'created' ? createdOpportunities : donatedOpportunities;
     setTotalPages(Math.max(1, Math.ceil(opportunities.length / PAGE_SIZE)));
   }, [activeTab, createdOpportunities, donatedOpportunities]);
 
@@ -52,12 +59,16 @@ export default function DashboardPage() {
 
       try {
         // Get all opportunities and filter for ones created by user
-        const { opportunities } = await donationOpportunities.getOpportunitiesPaginated(currentPage);
-        const created = opportunities.filter(opp => opp.creatorAddress.toLowerCase() === address.toLowerCase());
+        const opportunities = donationOpportunities.allOpportunities;
+        const created = opportunities.filter(
+          (opp) => opp.creatorAddress.toLowerCase() === address.toLowerCase()
+        );
         setCreatedOpportunities(created ?? []);
 
         // Get opportunities the user has donated to
-        const donated = await donationOpportunities.getUserDonatedOpportunities(address);
+        const donated = await donationOpportunities.getUserDonatedOpportunities(
+          address
+        );
         setDonatedOpportunities(donated ?? []);
       } catch (error) {
         console.error('Error fetching opportunities:', error);
@@ -67,14 +78,19 @@ export default function DashboardPage() {
     };
 
     fetchOpportunities();
-  }, [address, donationOpportunities.getUserDonatedOpportunities, donationOpportunities.getAllOpportunities]);
+  }, [
+    address,
+    donationOpportunities.getUserDonatedOpportunities,
+    donationOpportunities.getAllOpportunities,
+  ]);
 
   const handleDonate = async (id: bigint, amount: bigint) => {
     try {
       await donationOpportunities.donate(id, amount);
       // Refresh the donations
       if (address) {
-        const opportunities = await donationOpportunities.getUserDonatedOpportunities(address);
+        const opportunities =
+          await donationOpportunities.getUserDonatedOpportunities(address);
         setDonatedOpportunities(opportunities);
       }
     } catch (error) {
@@ -88,7 +104,9 @@ export default function DashboardPage() {
       // Refresh created opportunities
       if (address) {
         const all = await donationOpportunities.getAllOpportunities();
-        const created = all.filter(opp => opp.creatorAddress.toLowerCase() === address.toLowerCase());
+        const created = all.filter(
+          (opp) => opp.creatorAddress.toLowerCase() === address.toLowerCase()
+        );
         setCreatedOpportunities(created);
       }
     } catch (error) {
@@ -111,7 +129,8 @@ export default function DashboardPage() {
   };
 
   const getCurrentPageOpportunities = () => {
-    const opportunities = activeTab === 'created' ? createdOpportunities : donatedOpportunities;
+    const opportunities =
+      activeTab === 'created' ? createdOpportunities : donatedOpportunities;
     const startIndex = (currentPage - 1) * PAGE_SIZE;
     const endIndex = startIndex + PAGE_SIZE;
     return opportunities.slice(startIndex, endIndex);
@@ -142,13 +161,18 @@ export default function DashboardPage() {
     );
   }
 
-  const opportunities = activeTab === 'created' ? createdOpportunities : donatedOpportunities;
-  const emptyMessage = activeTab === 'created' ? 'No Created Opportunities' : 'No Donations Yet';
-  const emptyDescription = activeTab === 'created'
-    ? 'You haven\'t created any opportunities yet. Create your first one!'
-    : 'You haven\'t made any donations yet. Browse opportunities to start donating!';
-  const emptyActionLink = activeTab === 'created' ? '/create' : '/opportunities';
-  const emptyActionText = activeTab === 'created' ? 'Create Opportunity' : 'Browse Opportunities';
+  const opportunities =
+    activeTab === 'created' ? createdOpportunities : donatedOpportunities;
+  const emptyMessage =
+    activeTab === 'created' ? 'No Created Opportunities' : 'No Donations Yet';
+  const emptyDescription =
+    activeTab === 'created'
+      ? "You haven't created any opportunities yet. Create your first one!"
+      : "You haven't made any donations yet. Browse opportunities to start donating!";
+  const emptyActionLink =
+    activeTab === 'created' ? '/create' : '/opportunities';
+  const emptyActionText =
+    activeTab === 'created' ? 'Create Opportunity' : 'Browse Opportunities';
 
   return (
     <div className='container mx-auto px-4 py-8'>
@@ -185,8 +209,8 @@ export default function DashboardPage() {
       </div>
 
       {isLoading ? (
-        <div className="flex justify-center items-center min-h-[300px]">
-          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
+        <div className='flex justify-center items-center min-h-[300px]'>
+          <div className='animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary'></div>
         </div>
       ) : getCurrentPageOpportunities().length > 0 ? (
         <>
@@ -206,44 +230,51 @@ export default function DashboardPage() {
 
           {/* Pagination Controls */}
           {totalPages > 1 && (
-            <div className="flex justify-center items-center gap-4 mt-8">
+            <div className='flex justify-center items-center gap-4 mt-8'>
               <button
                 onClick={() => {
                   setCurrentPage((prev) => Math.max(1, prev - 1));
-                  setPageInput((prev) => Math.max(1, parseInt(prev) - 1).toString());
+                  setPageInput((prev) =>
+                    Math.max(1, parseInt(prev) - 1).toString()
+                  );
                 }}
                 disabled={currentPage === 1}
-                className="px-4 py-2 text-sm bg-gray-100 text-gray-700 rounded hover:bg-gray-200 disabled:opacity-50"
+                className='px-4 py-2 text-sm bg-gray-100 text-gray-700 rounded hover:bg-gray-200 disabled:opacity-50'
               >
                 Previous
               </button>
-              <form onSubmit={handlePageSubmit} className="flex items-center gap-2">
+              <form
+                onSubmit={handlePageSubmit}
+                className='flex items-center gap-2'
+              >
                 <input
-                  type="number"
-                  min="1"
+                  type='number'
+                  min='1'
                   max={totalPages}
                   value={pageInput}
                   onChange={handlePageInputChange}
-                  className="w-16 px-2 py-1 border rounded"
-                  aria-label="Go to page"
+                  className='w-16 px-2 py-1 border rounded'
+                  aria-label='Go to page'
                 />
                 <button
-                  type="submit"
-                  className="px-3 py-1 text-sm bg-blue-500 text-white rounded hover:bg-blue-600"
+                  type='submit'
+                  className='px-3 py-1 text-sm bg-blue-500 text-white rounded hover:bg-blue-600'
                 >
                   Go
                 </button>
               </form>
-              <span className="text-gray-600">
+              <span className='text-gray-600'>
                 Page {currentPage} of {totalPages}
               </span>
               <button
                 onClick={() => {
                   setCurrentPage((prev) => Math.min(totalPages, prev + 1));
-                  setPageInput((prev) => Math.min(totalPages, parseInt(prev) + 1).toString());
+                  setPageInput((prev) =>
+                    Math.min(totalPages, parseInt(prev) + 1).toString()
+                  );
                 }}
                 disabled={currentPage === totalPages}
-                className="px-4 py-2 text-sm bg-gray-100 text-gray-700 rounded hover:bg-gray-200 disabled:opacity-50"
+                className='px-4 py-2 text-sm bg-gray-100 text-gray-700 rounded hover:bg-gray-200 disabled:opacity-50'
               >
                 Next
               </button>
@@ -255,9 +286,7 @@ export default function DashboardPage() {
           <h2 className='text-xl font-semibold text-gray-900 mb-2'>
             {emptyMessage}
           </h2>
-          <p className='text-gray-600 mb-8'>
-            {emptyDescription}
-          </p>
+          <p className='text-gray-600 mb-8'>{emptyDescription}</p>
           <Link
             href={emptyActionLink}
             className='inline-block px-6 py-3 bg-primary text-white rounded-md hover:bg-primary/90 transition-colors'
