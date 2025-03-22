@@ -136,16 +136,16 @@ export default function OpportunitiesPage() {
 
   return (
     <div className='container mx-auto px-4 py-8'>
-      <div className='flex justify-between items-center mb-8'>
-        <h1 className='text-3xl font-bold'>Donation Opportunities</h1>
-        <div className='flex items-center gap-4'>
+      <div className='flex flex-col md:flex-row justify-between items-center mb-8 gap-4'>
+        <h1 className='text-2xl md:text-3xl font-bold'>Donation Opportunities</h1>
+        <div className='flex flex-col sm:flex-row items-center gap-4'>
           <span className='text-sm text-gray-500'>
             Last updated: {lastRefresh.toLocaleTimeString()}
           </span>
           <button
             onClick={handleManualRefresh}
             disabled={isLoading}
-            className='px-4 py-2 bg-primary text-white rounded-md hover:bg-primary/90 disabled:opacity-50'
+            className='w-full sm:w-auto px-4 py-2 bg-primary text-white rounded-md hover:bg-primary/90 disabled:opacity-50'
           >
             {isLoading ? 'Refreshing...' : 'Refresh'}
           </button>
