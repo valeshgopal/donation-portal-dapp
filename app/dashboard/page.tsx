@@ -52,8 +52,8 @@ export default function DashboardPage() {
 
       try {
         // Get all opportunities and filter for ones created by user
-        const all = await donationOpportunities.getAllOpportunities();
-        const created = all.filter(opp => opp.creatorAddress.toLowerCase() === address.toLowerCase());
+        const { opportunities } = await donationOpportunities.getOpportunitiesPaginated(currentPage);
+        const created = opportunities.filter(opp => opp.creatorAddress.toLowerCase() === address.toLowerCase());
         setCreatedOpportunities(created ?? []);
 
         // Get opportunities the user has donated to

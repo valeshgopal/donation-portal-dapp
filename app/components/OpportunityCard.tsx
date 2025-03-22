@@ -2,6 +2,8 @@ import Link from 'next/link';
 import { useState } from 'react';
 import { Opportunity } from '../lib/contracts/types';
 import { formatEther, parseEther } from 'viem';
+import toast from 'react-hot-toast';
+
 export interface OpportunityCardProps {
   opportunity: Opportunity;
   userAddress?: `0x${string}`;
@@ -26,9 +28,14 @@ export function OpportunityCard({
   const [isProcessingDonation, setIsProcessingDonation] = useState(false);
 
   const handleStopCampaign = async () => {
+    const toastId = toast.loading('Stopping campaign...');
     try {
       setIsUpdating(true);
       await onStopCampaign(opportunity.id);
+      toast.success('Campaign stopped successfully.', { id: toastId });
+    } catch (error) {
+      console.error('Error stopping campaign:', error);
+      toast.error('Failed to stop campaign. Please try again.', { id: toastId });
     } finally {
       setIsUpdating(false);
     }
@@ -38,11 +45,16 @@ export function OpportunityCard({
     e.preventDefault();
     if (!donationAmount) return;
 
+    const toastId = toast.loading('Processing donation...');
     try {
       setIsProcessingDonation(true);
       const amount = parseEther(donationAmount);
       await onDonate(opportunity.id, amount);
       setDonationAmount('');
+      toast.success('Donation successful! Thank you for your contribution.', { id: toastId });
+    } catch (error) {
+      console.error('Donation error:', error);
+      toast.error('Failed to process donation. Please try again.', { id: toastId });
     } finally {
       setIsProcessingDonation(false);
     }
@@ -140,12 +152,12 @@ export function OpportunityCard({
           </form>
         )}
 
-        {totalUserDonation && (
+        {totalUserDonation ? (
           <p className='text-xs text-gray-500 mt-1'>
             Your contribution:{' '}
             <span className='font-semibold'>{totalUserDonation} ETH</span>
           </p>
-        )}
+        ) : null}
 
         <div className='mt-6 space-y-2'>
           <div className='client-only'>
