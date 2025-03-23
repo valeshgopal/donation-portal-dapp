@@ -11,6 +11,12 @@ contract DonationOpportunity is ReentrancyGuard, Ownable, Pausable {
         uint256 timestamp;
     }
 
+    // Constants
+    uint256 public constant FEE_PERCENTAGE = 500; // 5% (500/10000)
+    uint256 public constant FEE_DENOMINATOR = 10000;
+    uint256 public constant MAX_DONORS = 10000;
+
+    // State variables
     string public title;
     uint256 public fundingGoal;
     uint256 public currentRaised;
@@ -21,8 +27,6 @@ contract DonationOpportunity is ReentrancyGuard, Ownable, Pausable {
     uint256 public createdAt;
     
     // Fee configuration
-    uint256 public constant FEE_PERCENTAGE = 500; // 5% (500/10000)
-    uint256 public constant FEE_DENOMINATOR = 10000;
     address public feeRecipient;
     address public factory;
     
@@ -36,6 +40,7 @@ contract DonationOpportunity is ReentrancyGuard, Ownable, Pausable {
     // Mapping to check if an address has donated
     mapping(address => bool) private hasDonated;
 
+    // Events
     event DonationReceived(
         address indexed donor,
         uint256 amount,
@@ -47,10 +52,12 @@ contract DonationOpportunity is ReentrancyGuard, Ownable, Pausable {
     event FeeTransferred(address indexed feeRecipient, uint256 amount);
     event FeeRecipientUpdated(address indexed newFeeRecipient);
 
+    // Modifiers
     modifier onlyCreator() {
         require(msg.sender == creatorAddress, "Only creator can call this");
         _;
     }
+
 
     constructor(
         string memory _title,
@@ -66,6 +73,7 @@ contract DonationOpportunity is ReentrancyGuard, Ownable, Pausable {
         require(_creatorAddress != address(0), "Invalid creator address");
         require(_feeRecipient != address(0), "Invalid fee recipient address");
         require(_factory != address(0), "Invalid factory address");
+        require(bytes(_title).length > 0, "Title cannot be empty");
 
         title = _title;
         fundingGoal = _fundingGoal;
@@ -84,13 +92,13 @@ contract DonationOpportunity is ReentrancyGuard, Ownable, Pausable {
     function donate() external payable nonReentrant whenNotPaused {
         require(active, "Opportunity is not active");
         require(msg.value > 0, "Donation amount must be greater than 0");
-        require(currentRaised + msg.value <= fundingGoal, "Target amount exceeded");
 
         // Calculate fee (5%)
         uint256 fee = (msg.value * FEE_PERCENTAGE) / FEE_DENOMINATOR;
         uint256 recipientAmount = msg.value - fee;
 
         // Update state BEFORE external calls (Checks-Effects-Interactions pattern)
+        require(currentRaised + msg.value >= currentRaised, "Overflow protection");
         currentRaised += msg.value;
         totalFeesCollected += fee;
 
@@ -100,8 +108,8 @@ contract DonationOpportunity is ReentrancyGuard, Ownable, Pausable {
             timestamp: block.timestamp
         }));
 
-        // Add to donors list if first time
         if (!hasDonated[msg.sender]) {
+            require(donors.length < MAX_DONORS, "Maximum number of unique donors reached");
             hasDonated[msg.sender] = true;
             donors.push(msg.sender);
         }
@@ -136,18 +144,17 @@ contract DonationOpportunity is ReentrancyGuard, Ownable, Pausable {
         emit OpportunityStatusChanged(true);
     }
 
-    // Remove the incorrect withdraw function as funds are directly sent to recipient
-    // If emergency fund recovery is needed, use a separate function with proper access control
-
-    // Emergency fund recovery function
     function emergencyWithdraw() external onlyOwner nonReentrant {
+        address ownerAddress = owner();
+        require(ownerAddress != address(0), "Owner is zero address");
+
         uint256 amount = address(this).balance;
         require(amount > 0, "No funds to withdraw");
         
-        (bool success, ) = owner().call{value: amount}("");
+        (bool success, ) = ownerAddress.call{value: amount}("");
         require(success, "Emergency withdrawal failed");
         
-        emit FundsWithdrawn(owner(), amount);
+        emit FundsWithdrawn(ownerAddress, amount);
     }
 
     function pause() external onlyOwner {
@@ -202,7 +209,6 @@ contract DonationOpportunity is ReentrancyGuard, Ownable, Pausable {
         return donors.length;
     }
 
-    // Function to get opportunity details in one call
     function getOpportunityDetails() external view returns (
         string memory _title,
         uint256 _fundingGoal,
