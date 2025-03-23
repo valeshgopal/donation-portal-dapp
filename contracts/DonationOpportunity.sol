@@ -15,6 +15,8 @@ contract DonationOpportunity is ReentrancyGuard, Ownable, Pausable {
     uint256 public constant FEE_PERCENTAGE = 500; // 5% (500/10000)
     uint256 public constant FEE_DENOMINATOR = 10000;
     uint256 public constant MAX_DONORS = 10000;
+    uint256 public constant WITHDRAW_DELAY = 2 days;
+    uint256 public constant MIN_DONATION = 0.001 ether;
 
     // State variables
     string public title;
@@ -91,7 +93,7 @@ contract DonationOpportunity is ReentrancyGuard, Ownable, Pausable {
 
     function donate() external payable nonReentrant whenNotPaused {
         require(active, "Opportunity is not active");
-        require(msg.value > 0, "Donation amount must be greater than 0");
+        require(msg.value >= MIN_DONATION, "Donation amount too small");
 
         // Calculate fee (5%)
         uint256 fee = (msg.value * FEE_PERCENTAGE) / FEE_DENOMINATOR;
@@ -100,6 +102,7 @@ contract DonationOpportunity is ReentrancyGuard, Ownable, Pausable {
         // Update state BEFORE external calls (Checks-Effects-Interactions pattern)
         require(currentRaised + msg.value >= currentRaised, "Overflow protection");
         currentRaised += msg.value;
+        require(totalFeesCollected + fee >= totalFeesCollected, "Overflow protection");
         totalFeesCollected += fee;
 
         // Record donation
@@ -144,7 +147,12 @@ contract DonationOpportunity is ReentrancyGuard, Ownable, Pausable {
         emit OpportunityStatusChanged(true);
     }
 
+    function requestEmergencyWithdraw() external onlyOwner {
+        lastWithdrawRequest = block.timestamp;
+    }   
+
     function emergencyWithdraw() external onlyOwner nonReentrant {
+        require(block.timestamp >= lastWithdrawRequest + WITHDRAW_DELAY, "Timelock active");
         address ownerAddress = owner();
         require(ownerAddress != address(0), "Owner is zero address");
 

@@ -134,17 +134,21 @@ export function OpportunityCard({
             <div className='flex gap-2'>
               <input
                 type='number'
-                step='0.01'
+                step='1'
+                min='0.001'
                 value={donationAmount}
                 onChange={(e) => setDonationAmount(e.target.value)}
-                placeholder='Amount in ETH'
+                placeholder='Amount in ETH (min: 0.001)'
                 className='flex-1 border rounded-md px-3 py-2'
                 disabled={isProcessingDonation || !opportunity.active}
               />
               <button
                 type='submit'
                 disabled={
-                  !donationAmount || isProcessingDonation || !opportunity.active
+                  !donationAmount ||
+                  parseFloat(donationAmount) < 0.001 ||
+                  isProcessingDonation ||
+                  !opportunity.active
                 }
                 className='bg-primary text-white px-4 py-2 rounded-md hover:bg-primary/90 disabled:opacity-50'
               >

@@ -323,8 +323,8 @@ export function CreateOpportunityForm() {
       case 'fundingGoal':
         return !value
           ? 'Funding goal is required'
-          : parseFloat(value) <= 0
-          ? 'Funding goal must be greater than 0'
+          : parseFloat(value) < 0.1
+          ? 'Funding goal must be at least 0.1 ETH'
           : undefined;
       case 'recipientWallet':
         return !value.trim()

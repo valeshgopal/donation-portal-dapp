@@ -30,6 +30,7 @@ contract OpportunityFactory is Ownable, Pausable, ReentrancyGuard {
     
     // Max number of opportunities allowed
     uint256 public maxOpportunities = 1000;
+    uint256 public constant MIN_FUNDING_GOAL = 0.1 ether;
 
     constructor(address _feeRecipient) {
         require(_feeRecipient != address(0), "Invalid fee recipient address");
@@ -47,6 +48,7 @@ contract OpportunityFactory is Ownable, Pausable, ReentrancyGuard {
         require(_fundingGoal > 0, "Funding goal must be greater than 0");
         require(_recipientWallet != address(0), "Invalid recipient address");
         require(bytes(_metadataURI).length > 0, "Empty metadata not allowed");
+        require(_fundingGoal >= MIN_FUNDING_GOAL, "Funding goal too low");
         
         DonationOpportunity opportunity = new DonationOpportunity(
             _title,
@@ -124,7 +126,9 @@ contract OpportunityFactory is Ownable, Pausable, ReentrancyGuard {
     }
 
     // Function to receive fees from opportunities
-    receive() external payable {
+    receive() external payable nonReentrant{
+        require(opportunityToCreator[msg.sender] != address(0), "Only donations from created campaigns allowed");
+
         if (msg.value > 0) {
             totalFeesCollected += msg.value;
             emit FeeCollected(msg.value);
