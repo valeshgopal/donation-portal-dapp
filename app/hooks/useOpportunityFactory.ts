@@ -14,7 +14,7 @@ export function useOpportunityFactory() {
   const createOpportunity = useCallback(
     async (
       title: string,
-      fundingGoal: string,
+      fundingGoal: string, // in ETH
       recipientWallet: `0x${string}`,
       metadataURI: string
     ) => {
@@ -23,7 +23,12 @@ export function useOpportunityFactory() {
           address: factoryAddress,
           abi: opportunityFactoryABI,
           functionName: 'createOpportunity',
-          args: [title, parseEther(fundingGoal), recipientWallet, metadataURI],
+          args: [
+            title,
+            parseEther(fundingGoal), // Convert ETH to Wei for contract
+            recipientWallet,
+            metadataURI,
+          ],
         });
         return tx;
       } catch (error) {

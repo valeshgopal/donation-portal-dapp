@@ -61,6 +61,12 @@ interface DonationOpportunitiesHook {
   getUserDonationsForOpportunity: DonationOpportunitiesContract['getUserDonationsForOpportunity'];
   getFeaturedOpportunities: DonationOpportunitiesContract['getFeaturedOpportunities'];
   refetch: () => Promise<any>;
+  handleFilter: (filters: {
+    cause?: string;
+    location?: string;
+    status?: 'active' | 'inactive' | 'all';
+    search?: string;
+  }) => void;
 }
 
 // Helper function to fetch metadata from IPFS
@@ -83,6 +89,9 @@ const fetchMetadata = async (
 export function useDonationOpportunities(): DonationOpportunitiesHook {
   const [opportunities, setOpportunities] = useState<Opportunity[]>([]);
   const [allOpportunities, setAllOpportunities] = useState<Opportunity[]>([]);
+  const [filteredOpportunities, setFilteredOpportunities] = useState<
+    Opportunity[]
+  >([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
   const [totalPages, setTotalPages] = useState(1);
@@ -191,9 +200,8 @@ export function useDonationOpportunities(): DonationOpportunitiesHook {
         );
 
         setAllOpportunities(opportunitiesData);
-        setTotalPages(
-          Math.max(1, Math.ceil(opportunitiesData.length / PAGE_SIZE))
-        );
+        setFilteredOpportunities(opportunitiesData);
+        setOpportunities(opportunitiesData);
       } catch (error) {
         console.error('Error fetching opportunities:', error);
         const errInstance =
@@ -207,14 +215,22 @@ export function useDonationOpportunities(): DonationOpportunitiesHook {
     fetchAllOpportunities();
   }, [publicClient]);
 
-  // Handle pagination in memory
+  // Update opportunities when filtered opportunities change
   useEffect(() => {
-    if (allOpportunities.length > 0) {
+    setOpportunities(filteredOpportunities);
+  }, [filteredOpportunities]);
+
+  // Handle pagination in memory for filtered opportunities
+  useEffect(() => {
+    if (filteredOpportunities.length > 0) {
       const startIndex = (currentPage - 1) * PAGE_SIZE;
       const endIndex = startIndex + PAGE_SIZE;
-      setOpportunities(allOpportunities.slice(startIndex, endIndex));
+      setOpportunities(filteredOpportunities.slice(startIndex, endIndex));
+      setTotalPages(
+        Math.max(1, Math.ceil(filteredOpportunities.length / PAGE_SIZE))
+      );
     }
-  }, [currentPage, allOpportunities]);
+  }, [currentPage, filteredOpportunities]);
 
   // Ensure currentPage stays within valid bounds
   useEffect(() => {
@@ -229,13 +245,16 @@ export function useDonationOpportunities(): DonationOpportunitiesHook {
     async (page: number) => {
       const startIndex = (page - 1) * PAGE_SIZE;
       const endIndex = startIndex + PAGE_SIZE;
-      const pageOpportunities = allOpportunities.slice(startIndex, endIndex);
+      const pageOpportunities = filteredOpportunities.slice(
+        startIndex,
+        endIndex
+      );
       return {
         opportunities: pageOpportunities,
-        totalCount: allOpportunities.length,
+        totalCount: filteredOpportunities.length,
       };
     },
-    [allOpportunities]
+    [filteredOpportunities]
   );
 
   // Write contract functions
@@ -287,7 +306,7 @@ export function useDonationOpportunities(): DonationOpportunitiesHook {
   const donate = async (id: bigint, value: bigint): Promise<void> => {
     if (!publicClient) throw new Error('Public client not available');
 
-    const opportunity = opportunities.find((opp) => opp.id === id);
+    const opportunity = allOpportunities.find((opp) => opp.id === id);
     if (!opportunity) {
       throw new Error('Invalid opportunity ID');
     }
@@ -308,7 +327,10 @@ export function useDonationOpportunities(): DonationOpportunitiesHook {
       await refetch();
     } catch (err) {
       console.error('Error donating:', err);
-      throw err;
+      // Re-throw the error to ensure it's handled by the caller
+      throw err instanceof Error
+        ? err
+        : new Error('Failed to process donation');
     }
   };
 
@@ -430,7 +452,7 @@ export function useDonationOpportunities(): DonationOpportunitiesHook {
       if (!publicClient) throw new Error('Public client not available');
 
       // Find opportunity by ID (which is derived from address)
-      const opp = opportunities.find(
+      const opp = allOpportunities.find(
         (o) => BigInt(parseInt(o.address.slice(2), 16)) === id
       );
 
@@ -477,7 +499,7 @@ export function useDonationOpportunities(): DonationOpportunitiesHook {
       if (!publicClient) throw new Error('Public client not available');
 
       const donatedOpportunities = await Promise.all(
-        opportunities.map(async (opp, index) => {
+        allOpportunities.map(async (opp, index) => {
           try {
             const donations = await publicClient.readContract({
               address: opp.address,
@@ -524,7 +546,7 @@ export function useDonationOpportunities(): DonationOpportunitiesHook {
         (opp): opp is Opportunity => opp !== null
       );
     },
-    [opportunities, publicClient]
+    [allOpportunities, publicClient]
   );
 
   const getUserDonationsForOpportunity = useCallback<
@@ -655,9 +677,8 @@ export function useDonationOpportunities(): DonationOpportunitiesHook {
         );
 
         setAllOpportunities(opportunitiesData);
-        setTotalPages(
-          Math.max(1, Math.ceil(opportunitiesData.length / PAGE_SIZE))
-        );
+        setFilteredOpportunities(opportunitiesData);
+        setOpportunities(opportunitiesData);
       } catch (error) {
         console.error('Error fetching opportunities:', error);
         const errInstance =
@@ -670,6 +691,47 @@ export function useDonationOpportunities(): DonationOpportunitiesHook {
 
     await fetchAllOpportunities();
   }, [publicClient]);
+
+  // Modify handleFilter to handle pagination
+  const handleFilter = useCallback(
+    (filters: {
+      cause?: string;
+      location?: string;
+      status?: 'active' | 'inactive' | 'all';
+      search?: string;
+    }) => {
+      let filtered = allOpportunities;
+
+      if (filters.search) {
+        const searchLower = filters.search.toLowerCase();
+        filtered = filtered.filter(
+          (opp) =>
+            opp.title.toLowerCase().includes(searchLower) ||
+            opp.description.toLowerCase().includes(searchLower) ||
+            opp.summary.toLowerCase().includes(searchLower)
+        );
+      }
+
+      if (filters.cause) {
+        filtered = filtered.filter((opp) => opp.cause.includes(filters.cause!));
+      }
+
+      if (filters.location) {
+        filtered = filtered.filter((opp) => opp.location === filters.location);
+      }
+
+      if (filters.status && filters.status !== 'all') {
+        filtered = filtered.filter((opp) => {
+          if (filters.status === 'active') return opp.active;
+          return !opp.active;
+        });
+      }
+
+      setFilteredOpportunities(filtered);
+      setCurrentPage(1); // Reset to first page when filtering
+    },
+    [allOpportunities]
+  );
 
   return {
     opportunities,
@@ -690,5 +752,6 @@ export function useDonationOpportunities(): DonationOpportunitiesHook {
     getUserDonationsForOpportunity,
     getFeaturedOpportunities,
     refetch,
+    handleFilter,
   };
 }

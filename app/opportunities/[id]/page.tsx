@@ -8,6 +8,7 @@ import { useDonationOpportunities } from '../../hooks/useDonationOpportunities';
 import { Opportunity } from '../../lib/contracts/types';
 import { formatEther, parseEther } from 'viem';
 import { Suspense } from 'react';
+import toast from 'react-hot-toast';
 
 // Helper function to get Sepolia explorer URLs
 const getExplorerUrl = (type: 'tx' | 'address', hash: string) => {
@@ -16,7 +17,7 @@ const getExplorerUrl = (type: 'tx' | 'address', hash: string) => {
 
 function OpportunityContent() {
   const params = useParams();
-  const opportunityAddress = params?.id as `0x${string}`;
+  const opportunityAddress = params?.id as string;
   const { address } = useAccount();
   const [opportunity, setOpportunity] = useState<Opportunity | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -28,9 +29,8 @@ function OpportunityContent() {
   useEffect(() => {
     const fetchOpportunity = async () => {
       try {
-        // Find the opportunity with matching address
-        const allOpps = await donationOpportunities.getAllOpportunities();
-        const opp = allOpps.find((o) => o.address === opportunityAddress);
+        const id = BigInt(parseInt(opportunityAddress.slice(2), 16));
+        const opp = await donationOpportunities.getOpportunity(id);
         if (!opp) throw new Error('Opportunity not found');
         setOpportunity(opp);
       } catch (error) {
@@ -43,7 +43,7 @@ function OpportunityContent() {
     if (opportunityAddress) {
       fetchOpportunity();
     }
-  }, [opportunityAddress, donationOpportunities]);
+  }, [opportunityAddress, donationOpportunities.getOpportunity]);
 
   const handleDonate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -52,14 +52,19 @@ function OpportunityContent() {
     try {
       setIsProcessingDonation(true);
       const amount = parseEther(donationAmount);
+
       await donationOpportunities.donate(opportunity.id, amount);
       // Refresh opportunity data
-      const allOpps = await donationOpportunities.getAllOpportunities();
-      const updatedOpp = allOpps.find((o) => o.address === opportunityAddress);
+      await donationOpportunities.refetch();
+      const updatedOpp = await donationOpportunities.getOpportunity(
+        opportunity.id
+      );
       if (updatedOpp) setOpportunity(updatedOpp);
       setDonationAmount('');
+      toast.success('Donation successful! Thank you for your contribution.');
     } catch (error) {
       console.error('Error donating:', error);
+      toast.error('Failed to process donation. Please try again.');
     } finally {
       setIsProcessingDonation(false);
     }

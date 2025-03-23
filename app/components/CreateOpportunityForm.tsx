@@ -536,6 +536,7 @@ export function CreateOpportunityForm() {
         );
 
         setTxHash(tx as `0x${string}`);
+        toast.success('Opportunity created successfully!', { id: toastId });
       } catch (metadataError) {
         toast.error('Failed to create opportunity. Please try again.', {
           id: toastId,
@@ -585,7 +586,7 @@ export function CreateOpportunityForm() {
 
   useEffect(() => {
     if (isSuccess && txHash) {
-      toast.success('Opportunity created successfully!');
+      // toast.success('Opportunity created successfully!');
       // Store success message in sessionStorage
       sessionStorage.setItem('opportunityCreated', formData.title);
       // Redirect to dashboard

@@ -35,7 +35,9 @@ export function OpportunityCard({
       toast.success('Campaign stopped successfully.', { id: toastId });
     } catch (error) {
       console.error('Error stopping campaign:', error);
-      toast.error('Failed to stop campaign. Please try again.', { id: toastId });
+      toast.error('Failed to stop campaign. Please try again.', {
+        id: toastId,
+      });
     } finally {
       setIsUpdating(false);
     }
@@ -51,10 +53,14 @@ export function OpportunityCard({
       const amount = parseEther(donationAmount);
       await onDonate(opportunity.id, amount);
       setDonationAmount('');
-      toast.success('Donation successful! Thank you for your contribution.', { id: toastId });
+      toast.success('Donation successful! Thank you for your contribution.', {
+        id: toastId,
+      });
     } catch (error) {
       console.error('Donation error:', error);
-      toast.error('Failed to process donation. Please try again.', { id: toastId });
+      toast.error('Failed to process donation. Please try again.', {
+        id: toastId,
+      });
     } finally {
       setIsProcessingDonation(false);
     }

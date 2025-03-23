@@ -11,6 +11,7 @@ export default function OpportunitiesPage() {
   const { address } = useAccount();
   const {
     opportunities,
+    allOpportunities,
     isLoading,
     error: hookError,
     totalPages,
@@ -18,6 +19,7 @@ export default function OpportunitiesPage() {
     setCurrentPage,
     donate,
     stopOpportunity,
+    handleFilter,
   } = useDonationOpportunities();
   const [filteredOpportunities, setFilteredOpportunities] = useState<
     Opportunity[]
@@ -58,37 +60,9 @@ export default function OpportunitiesPage() {
       status: 'active' | 'inactive' | 'all';
       search: string;
     }) => {
-      let filtered = opportunities;
-
-      // Apply search filter
-      if (filters.search) {
-        const searchLower = filters.search.toLowerCase();
-        filtered = filtered.filter((opp) =>
-          opp.title.toLowerCase().includes(searchLower)
-        );
-      }
-
-      // Apply cause filter
-      if (filters.cause) {
-        filtered = filtered.filter((opp) => opp.cause.includes(filters.cause));
-      }
-
-      // Apply location filter
-      if (filters.location) {
-        filtered = filtered.filter((opp) => opp.location === filters.location);
-      }
-
-      // Apply status filter
-      if (filters.status !== 'all') {
-        filtered = filtered.filter((opp) => {
-          if (filters.status === 'active') return opp.active;
-          return !opp.active;
-        });
-      }
-
-      setFilteredOpportunities(filtered);
+      handleFilter(filters);
     },
-    [opportunities]
+    [handleFilter]
   );
 
   const handleStopCampaign = useCallback(
@@ -111,7 +85,7 @@ export default function OpportunitiesPage() {
         await donate(id, amount);
       } catch (err) {
         console.error('Error donating:', err);
-        setError('Failed to process donation. Please try again.');
+        throw new Error('Failed to process donation. Please try again.');
       }
     },
     [donate]
@@ -155,8 +129,10 @@ export default function OpportunitiesPage() {
   return (
     <div className='container mx-auto px-4 py-8'>
       <div className='flex flex-col md:flex-row justify-between items-center mb-8 gap-4'>
-        <h1 className='text-2xl md:text-3xl font-bold'>Donation Opportunities</h1>
-        {/* <div className='flex flex-col sm:flex-row items-center gap-4'>
+        <h1 className='text-2xl md:text-3xl font-bold'>
+          Donation Opportunities
+        </h1>
+        <div className='flex flex-col sm:flex-row items-center gap-4'>
           <span className='text-sm text-gray-500'>
             Last updated: {lastRefresh.toLocaleTimeString()}
           </span>
@@ -167,7 +143,7 @@ export default function OpportunitiesPage() {
           >
             {isLoading ? 'Refreshing...' : 'Refresh'}
           </button>
-        </div> */}
+        </div>
       </div>
 
       {(error || hookError) && (
@@ -178,7 +154,9 @@ export default function OpportunitiesPage() {
 
       <OpportunityFilters
         onFilterChange={handleFilterChange}
-        causes={Array.from(new Set(opportunities.flatMap((opp) => opp.cause)))}
+        causes={Array.from(
+          new Set(allOpportunities.flatMap((opp) => opp.cause))
+        )}
       />
 
       <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-8'>
@@ -195,38 +173,40 @@ export default function OpportunitiesPage() {
 
       {/* Pagination Controls */}
       {totalPages > 1 && (
-        <div className="flex justify-center items-center space-x-2 mt-8">
+        <div className='flex justify-center items-center space-x-2 mt-8'>
           <button
             onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
             disabled={currentPage <= 1}
-            className="px-4 py-2 bg-primary text-white rounded-md hover:bg-primary/90 disabled:opacity-50"
+            className='px-4 py-2 bg-primary text-white rounded-md hover:bg-primary/90 disabled:opacity-50'
           >
             Previous
           </button>
-          <form onSubmit={handlePageSubmit} className="flex items-center gap-2">
+          <form onSubmit={handlePageSubmit} className='flex items-center gap-2'>
             <input
-              type="number"
-              min="1"
+              type='number'
+              min='1'
               max={totalPages}
               value={pageInput}
               onChange={handlePageInputChange}
-              className="w-16 px-2 py-1 border rounded"
-              aria-label="Go to page"
+              className='w-16 px-2 py-1 border rounded'
+              aria-label='Go to page'
             />
             <button
-              type="submit"
-              className="px-3 py-1 text-sm bg-blue-500 text-white rounded hover:bg-blue-600"
+              type='submit'
+              className='px-3 py-1 text-sm bg-blue-500 text-white rounded hover:bg-blue-600'
             >
               Go
             </button>
           </form>
-          <span className="text-gray-600">
+          <span className='text-gray-600'>
             Page {currentPage} of {totalPages}
           </span>
           <button
-            onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
+            onClick={() =>
+              setCurrentPage(Math.min(totalPages, currentPage + 1))
+            }
             disabled={currentPage >= totalPages}
-            className="px-4 py-2 bg-primary text-white rounded-md hover:bg-primary/90 disabled:opacity-50"
+            className='px-4 py-2 bg-primary text-white rounded-md hover:bg-primary/90 disabled:opacity-50'
           >
             Next
           </button>

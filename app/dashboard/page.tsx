@@ -18,15 +18,8 @@ export default function DashboardPage() {
   const [createdOpportunities, setCreatedOpportunities] = useState<
     Opportunity[]
   >([]);
-  const [isLoading, setIsLoading] = useState(true);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const donationOpportunities = useDonationOpportunities();
-
-  // Pagination states
-  const [currentPage, setCurrentPage] = useState(1);
-  const [pageInput, setPageInput] = useState(currentPage.toString());
-  const PAGE_SIZE = 9;
-  const [totalPages, setTotalPages] = useState(1);
 
   useEffect(() => {
     // Check for success message in sessionStorage
@@ -40,48 +33,22 @@ export default function DashboardPage() {
   }, []);
 
   useEffect(() => {
-    setCurrentPage(1);
-    setPageInput('1');
-  }, [activeTab]);
+    if (!address) return;
 
-  useEffect(() => {
-    const opportunities =
-      activeTab === 'created' ? createdOpportunities : donatedOpportunities;
-    setTotalPages(Math.max(1, Math.ceil(opportunities.length / PAGE_SIZE)));
-  }, [activeTab, createdOpportunities, donatedOpportunities]);
+    // Filter created opportunities from hook's data
+    const created = donationOpportunities.allOpportunities.filter(
+      (opp) => opp.creatorAddress.toLowerCase() === address.toLowerCase()
+    );
+    setCreatedOpportunities(created);
 
-  useEffect(() => {
-    const fetchOpportunities = async () => {
-      if (!address) {
-        setIsLoading(false);
-        return;
-      }
-
-      try {
-        // Get all opportunities and filter for ones created by user
-        const opportunities = donationOpportunities.allOpportunities;
-        const created = opportunities.filter(
-          (opp) => opp.creatorAddress.toLowerCase() === address.toLowerCase()
-        );
-        setCreatedOpportunities(created ?? []);
-
-        // Get opportunities the user has donated to
-        const donated = await donationOpportunities.getUserDonatedOpportunities(
-          address
-        );
-        setDonatedOpportunities(donated ?? []);
-      } catch (error) {
-        console.error('Error fetching opportunities:', error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchOpportunities();
+    // Get donated opportunities
+    donationOpportunities
+      .getUserDonatedOpportunities(address)
+      .then(setDonatedOpportunities);
   }, [
     address,
+    donationOpportunities.allOpportunities,
     donationOpportunities.getUserDonatedOpportunities,
-    donationOpportunities.getAllOpportunities,
   ]);
 
   const handleDonate = async (id: bigint, amount: bigint) => {
@@ -95,6 +62,7 @@ export default function DashboardPage() {
       }
     } catch (error) {
       console.error('Error donating:', error);
+      throw new Error('Failed to process donation. Please try again.');
     }
   };
 
@@ -103,8 +71,7 @@ export default function DashboardPage() {
       await donationOpportunities.stopOpportunity(id);
       // Refresh created opportunities
       if (address) {
-        const all = await donationOpportunities.getAllOpportunities();
-        const created = all.filter(
+        const created = donationOpportunities.allOpportunities.filter(
           (opp) => opp.creatorAddress.toLowerCase() === address.toLowerCase()
         );
         setCreatedOpportunities(created);
@@ -114,29 +81,7 @@ export default function DashboardPage() {
     }
   };
 
-  const handlePageInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setPageInput(e.target.value);
-  };
-
-  const handlePageSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    const page = parseInt(pageInput);
-    if (page >= 1 && page <= totalPages) {
-      setCurrentPage(page);
-    } else {
-      setPageInput(currentPage.toString());
-    }
-  };
-
-  const getCurrentPageOpportunities = () => {
-    const opportunities =
-      activeTab === 'created' ? createdOpportunities : donatedOpportunities;
-    const startIndex = (currentPage - 1) * PAGE_SIZE;
-    const endIndex = startIndex + PAGE_SIZE;
-    return opportunities.slice(startIndex, endIndex);
-  };
-
-  if (isLoading) {
+  if (donationOpportunities.isLoading) {
     return (
       <div className='animate-pulse grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 my-12 mx-4'>
         {[1, 2, 3].map((i) => (
@@ -146,7 +91,7 @@ export default function DashboardPage() {
     );
   }
 
-  if (!isLoading && !address) {
+  if (!address) {
     return (
       <div className='container mx-auto px-4 py-16'>
         <div className='text-center'>
@@ -208,79 +153,20 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {isLoading ? (
-        <div className='flex justify-center items-center min-h-[300px]'>
-          <div className='animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary'></div>
+      {opportunities.length > 0 ? (
+        <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6'>
+          {opportunities.map((opportunity) => (
+            <OpportunityCard
+              key={opportunity.id.toString()}
+              opportunity={opportunity}
+              userAddress={address}
+              onStopCampaign={handleStopCampaign}
+              onDonate={handleDonate}
+              showStopButton={false}
+              totalUserDonation={opportunity.totalUserDonation}
+            />
+          ))}
         </div>
-      ) : getCurrentPageOpportunities().length > 0 ? (
-        <>
-          <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6'>
-            {getCurrentPageOpportunities().map((opportunity) => (
-              <OpportunityCard
-                key={opportunity.id.toString()}
-                opportunity={opportunity}
-                userAddress={address}
-                onDonate={handleDonate}
-                showStopButton={activeTab === 'created'}
-                totalUserDonation={opportunity.totalUserDonation}
-                onStopCampaign={handleStopCampaign}
-              />
-            ))}
-          </div>
-
-          {/* Pagination Controls */}
-          {totalPages > 1 && (
-            <div className='flex justify-center items-center gap-4 mt-8'>
-              <button
-                onClick={() => {
-                  setCurrentPage((prev) => Math.max(1, prev - 1));
-                  setPageInput((prev) =>
-                    Math.max(1, parseInt(prev) - 1).toString()
-                  );
-                }}
-                disabled={currentPage === 1}
-                className='px-4 py-2 text-sm bg-gray-100 text-gray-700 rounded hover:bg-gray-200 disabled:opacity-50'
-              >
-                Previous
-              </button>
-              <form
-                onSubmit={handlePageSubmit}
-                className='flex items-center gap-2'
-              >
-                <input
-                  type='number'
-                  min='1'
-                  max={totalPages}
-                  value={pageInput}
-                  onChange={handlePageInputChange}
-                  className='w-16 px-2 py-1 border rounded'
-                  aria-label='Go to page'
-                />
-                <button
-                  type='submit'
-                  className='px-3 py-1 text-sm bg-blue-500 text-white rounded hover:bg-blue-600'
-                >
-                  Go
-                </button>
-              </form>
-              <span className='text-gray-600'>
-                Page {currentPage} of {totalPages}
-              </span>
-              <button
-                onClick={() => {
-                  setCurrentPage((prev) => Math.min(totalPages, prev + 1));
-                  setPageInput((prev) =>
-                    Math.min(totalPages, parseInt(prev) + 1).toString()
-                  );
-                }}
-                disabled={currentPage === totalPages}
-                className='px-4 py-2 text-sm bg-gray-100 text-gray-700 rounded hover:bg-gray-200 disabled:opacity-50'
-              >
-                Next
-              </button>
-            </div>
-          )}
-        </>
       ) : (
         <div className='text-center py-12 bg-white rounded-lg shadow-sm'>
           <h2 className='text-xl font-semibold text-gray-900 mb-2'>
