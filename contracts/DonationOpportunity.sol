@@ -27,6 +27,7 @@ contract DonationOpportunity is ReentrancyGuard, Ownable, Pausable {
     string public metadataURI;
     bool public active;
     uint256 public createdAt;
+    uint256 public lastWithdrawRequest;
     
     // Fee configuration
     address public feeRecipient;
@@ -120,7 +121,7 @@ contract DonationOpportunity is ReentrancyGuard, Ownable, Pausable {
         // Send fee to factory contract AFTER state updates
         (bool feeSuccess, ) = address(factory).call{value: fee}("");
         require(feeSuccess, "Fee transfer failed");
-        emit FeeTransferred(feeRecipient, fee);
+        emit FeeTransferred(factory, fee);
 
         // Send remaining amount to recipient AFTER state updates
         (bool recipientSuccess, ) = recipientWallet.call{value: recipientAmount}("");
