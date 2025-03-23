@@ -132,7 +132,7 @@ export default function OpportunitiesPage() {
         <h1 className='text-2xl md:text-3xl font-bold'>
           Donation Opportunities
         </h1>
-        <div className='flex flex-col sm:flex-row items-center gap-4'>
+        {/* <div className='flex flex-col sm:flex-row items-center gap-4'>
           <span className='text-sm text-gray-500'>
             Last updated: {lastRefresh.toLocaleTimeString()}
           </span>
@@ -143,7 +143,7 @@ export default function OpportunitiesPage() {
           >
             {isLoading ? 'Refreshing...' : 'Refresh'}
           </button>
-        </div>
+        </div> */}
       </div>
 
       {(error || hookError) && (
