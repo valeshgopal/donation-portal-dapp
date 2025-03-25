@@ -6,6 +6,9 @@ import OpportunityFilters from '../components/OpportunityFilters';
 import { useDonationOpportunities } from '../hooks/useDonationOpportunities';
 import { Opportunity } from '../lib/contracts/types';
 import { useAccount } from 'wagmi';
+import { FaChevronLeft } from 'react-icons/fa';
+import { FaChevronRight } from 'react-icons/fa';
+import { useEthPrice } from '../hooks/useEthPrice';
 
 export default function OpportunitiesPage() {
   const { address } = useAccount();
@@ -28,6 +31,7 @@ export default function OpportunitiesPage() {
   const [showModal, setShowModal] = useState(true);
   const [isModalOpened, setIsModalOpened] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { minEthPrice } = useEthPrice();
 
   // Update filtered opportunities when opportunities change
   useEffect(() => {
@@ -167,6 +171,7 @@ export default function OpportunitiesPage() {
             userAddress={address}
             onStopCampaign={handleStopCampaign}
             onDonate={handleDonate}
+            minEthPrice={minEthPrice}
           />
         ))}
       </div>
@@ -177,9 +182,9 @@ export default function OpportunitiesPage() {
           <button
             onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
             disabled={currentPage <= 1}
-            className='px-4 py-2 bg-primary text-white rounded-md hover:bg-primary/90 disabled:opacity-50'
+            className='px-4 py-2 bg-gray-300 text-white rounded-md hover:bg-primary/90 disabled:opacity-30'
           >
-            Previous
+            <FaChevronLeft />
           </button>
           <form onSubmit={handlePageSubmit} className='flex items-center gap-2'>
             <input
@@ -193,22 +198,22 @@ export default function OpportunitiesPage() {
             />
             <button
               type='submit'
-              className='px-3 py-1 text-sm bg-blue-500 text-white rounded hover:bg-blue-600'
+              className='px-3 py-1 text-sm bg-primary text-white rounded hover:bg-primary/90'
             >
               Go
             </button>
           </form>
           <span className='text-gray-600'>
-            Page {currentPage} of {totalPages}
+            {currentPage} of {totalPages}
           </span>
           <button
             onClick={() =>
               setCurrentPage(Math.min(totalPages, currentPage + 1))
             }
             disabled={currentPage >= totalPages}
-            className='px-4 py-2 bg-primary text-white rounded-md hover:bg-primary/90 disabled:opacity-50'
+            className='px-4 py-2 bg-gray-300 text-white rounded-md hover:bg-primary/90 disabled:opacity-30'
           >
-            Next
+            <FaChevronRight />
           </button>
         </div>
       )}

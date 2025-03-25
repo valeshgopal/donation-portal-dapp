@@ -11,14 +11,12 @@ contract DonationOpportunity is ReentrancyGuard, Ownable, Pausable {
         uint256 timestamp;
     }
 
-    // Constants
     uint256 public constant FEE_PERCENTAGE = 500; // 5% (500/10000)
     uint256 public constant FEE_DENOMINATOR = 10000;
     uint256 public constant MAX_DONORS = 10000;
     uint256 public constant WITHDRAW_DELAY = 2 days;
-    uint256 public constant MIN_DONATION = 0.001 ether;
+    uint256 public constant MIN_DONATION = 0.0001 ether;
 
-    // State variables
     string public title;
     uint256 public fundingGoal;
     uint256 public currentRaised;
@@ -29,21 +27,14 @@ contract DonationOpportunity is ReentrancyGuard, Ownable, Pausable {
     uint256 public createdAt;
     uint256 public lastWithdrawRequest;
     
-    // Fee configuration
     address public feeRecipient;
     address public factory;
-    
-    // Fee tracking
     uint256 public totalFeesCollected;
 
-    // Mapping to track donations by user
     mapping(address => UserDonation[]) public userDonations;
-    // Array to store unique donor addresses
     address[] public donors;
-    // Mapping to check if an address has donated
     mapping(address => bool) private hasDonated;
 
-    // Events
     event DonationReceived(
         address indexed donor,
         uint256 amount,
@@ -55,12 +46,10 @@ contract DonationOpportunity is ReentrancyGuard, Ownable, Pausable {
     event FeeTransferred(address indexed feeRecipient, uint256 amount);
     event FeeRecipientUpdated(address indexed newFeeRecipient);
 
-    // Modifiers
     modifier onlyCreator() {
         require(msg.sender == creatorAddress, "Only creator can call this");
         _;
     }
-
 
     constructor(
         string memory _title,
@@ -88,7 +77,6 @@ contract DonationOpportunity is ReentrancyGuard, Ownable, Pausable {
         active = true;
         createdAt = block.timestamp;
         
-        // Transfer ownership to creator instead of deployer
         _transferOwnership(_creatorAddress);
     }
 
@@ -100,13 +88,9 @@ contract DonationOpportunity is ReentrancyGuard, Ownable, Pausable {
         uint256 fee = (msg.value * FEE_PERCENTAGE) / FEE_DENOMINATOR;
         uint256 recipientAmount = msg.value - fee;
 
-        // Update state BEFORE external calls (Checks-Effects-Interactions pattern)
-        require(currentRaised + msg.value >= currentRaised, "Overflow protection");
         currentRaised += msg.value;
-        require(totalFeesCollected + fee >= totalFeesCollected, "Overflow protection");
         totalFeesCollected += fee;
 
-        // Record donation
         userDonations[msg.sender].push(UserDonation({
             amount: msg.value,
             timestamp: block.timestamp
@@ -166,52 +150,8 @@ contract DonationOpportunity is ReentrancyGuard, Ownable, Pausable {
         emit FundsWithdrawn(ownerAddress, amount);
     }
 
-    function pause() external onlyOwner {
-        _pause();
-    }
-
-    function unpause() external onlyOwner {
-        _unpause();
-    }
-
     function getUserDonations(address _user) external view returns (UserDonation[] memory) {
         return userDonations[_user];
-    }
-
-    function getDonors() external view returns (address[] memory) {
-        uint256 count = donors.length;
-        uint256 pageSize = 100;
-        
-        // Return only first page or full list if smaller than page size
-        uint256 returnSize = count < pageSize ? count : pageSize;
-        address[] memory result = new address[](returnSize);
-        
-        for (uint256 i = 0; i < returnSize; i++) {
-            result[i] = donors[i];
-        }
-        
-        return result;
-    }
-
-    function getDonorsPaginated(uint256 _page, uint256 _pageSize) external view returns (address[] memory) {
-        uint256 count = donors.length;
-        uint256 startIndex = _page * _pageSize;
-        
-        require(startIndex < count, "Page out of bounds");
-        
-        uint256 endIndex = startIndex + _pageSize;
-        if (endIndex > count) {
-            endIndex = count;
-        }
-        
-        uint256 resultSize = endIndex - startIndex;
-        address[] memory result = new address[](resultSize);
-        
-        for (uint256 i = 0; i < resultSize; i++) {
-            result[i] = donors[startIndex + i];
-        }
-        
-        return result;
     }
 
     function getDonorCount() external view returns (uint256) {
@@ -244,5 +184,15 @@ contract DonationOpportunity is ReentrancyGuard, Ownable, Pausable {
             totalFeesCollected,
             feeRecipient
         );
+    }
+
+        function pause() external onlyOwner {
+        _pause();
+        emit Paused(msg.sender);
+    }
+
+    function unpause() external onlyOwner {
+        _unpause();
+        emit Unpaused(msg.sender);
     }
 }

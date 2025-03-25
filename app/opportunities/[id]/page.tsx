@@ -9,6 +9,7 @@ import { Opportunity } from '../../lib/contracts/types';
 import { formatEther, parseEther } from 'viem';
 import { Suspense } from 'react';
 import toast from 'react-hot-toast';
+import { useEthPrice } from '../../hooks/useEthPrice';
 
 // Helper function to get Sepolia explorer URLs
 const getExplorerUrl = (type: 'tx' | 'address', hash: string) => {
@@ -25,6 +26,7 @@ function OpportunityContent() {
   const [isProcessingDonation, setIsProcessingDonation] = useState(false);
   const [isStoppingCampaign, setIsStoppingCampaign] = useState(false);
   const donationOpportunities = useDonationOpportunities();
+  const { minEthPrice } = useEthPrice();
 
   useEffect(() => {
     const fetchOpportunity = async () => {
@@ -229,10 +231,13 @@ function OpportunityContent() {
                     <div className='flex gap-2'>
                       <input
                         type='number'
-                        step='0.01'
+                        step='1'
+                        min={minEthPrice}
                         value={donationAmount}
                         onChange={(e) => setDonationAmount(e.target.value)}
-                        placeholder='Amount in ETH'
+                        placeholder={`Amount in ETH ${
+                          minEthPrice > 0 ? 'min: ' + minEthPrice : ''
+                        }`}
                         className='flex-1 border rounded-md px-3 py-2'
                         disabled={isProcessingDonation || !opportunity.active}
                       />

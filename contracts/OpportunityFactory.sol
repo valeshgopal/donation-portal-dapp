@@ -18,17 +18,12 @@ contract OpportunityFactory is Ownable, Pausable, ReentrancyGuard {
     event FeeWithdrawn(address indexed recipient, uint256 amount);
     event MaxOpportunitiesUpdated(uint256 newMaxOpportunities);
 
-    // Mapping from opportunity address to creator address
     mapping(address => address) public opportunityToCreator;
-    // Array to store all opportunity addresses
     address[] public opportunities;
     
-    // Fee recipient address
     address public feeRecipient;
-    // Total fees collected
     uint256 public totalFeesCollected;
     
-    // Max number of opportunities allowed
     uint256 public maxOpportunities = 1000;
     uint256 public constant MIN_FUNDING_GOAL = 0.1 ether;
 
@@ -92,11 +87,13 @@ contract OpportunityFactory is Ownable, Pausable, ReentrancyGuard {
     
     function getOpportunitiesPaginated(uint256 _page, uint256 _pageSize) external view returns (address[] memory) {
         uint256 count = opportunities.length;
-        uint256 startIndex = _page * _pageSize;
+        
+        uint256 actualPageSize = _pageSize > 100 ? 100 : _pageSize;
+        uint256 startIndex = _page * actualPageSize;
         
         require(startIndex < count, "Page out of bounds");
         
-        uint256 endIndex = startIndex + _pageSize;
+        uint256 endIndex = startIndex + actualPageSize;
         if (endIndex > count) {
             endIndex = count;
         }
@@ -104,8 +101,10 @@ contract OpportunityFactory is Ownable, Pausable, ReentrancyGuard {
         uint256 resultSize = endIndex - startIndex;
         address[] memory result = new address[](resultSize);
         
-        for (uint256 i = 0; i < resultSize; i++) {
-            result[i] = opportunities[startIndex + i];
+        unchecked {
+            for (uint256 i = 0; i < resultSize; i++) {
+                result[i] = opportunities[startIndex + i];
+            }
         }
         
         return result;
@@ -119,27 +118,24 @@ contract OpportunityFactory is Ownable, Pausable, ReentrancyGuard {
         return opportunities.length;
     }
 
-    // This function no longer accesses external opportunities as it's unnecessary
-    // Fees are directly sent to this contract via receive()
     function getTotalFeesCollected() external view returns (uint256) {
         return totalFeesCollected;
     }
 
-    // Function to receive fees from opportunities
-    receive() external payable nonReentrant{
+    receive() external payable nonReentrant {
         require(opportunityToCreator[msg.sender] != address(0), "Only donations from created campaigns allowed");
-
         if (msg.value > 0) {
             totalFeesCollected += msg.value;
             emit FeeCollected(msg.value);
         }
     }
 
-    // Function to withdraw collected fees
+    fallback() external payable {
+        revert("Direct ETH transfers not allowed");
+    }
+
     function withdrawFees() external onlyOwner nonReentrant {
         require(address(this).balance > 0, "No fees to withdraw");
-        
-        // Update state BEFORE external call
         uint256 amount = address(this).balance;
         totalFeesCollected = 0;
         
@@ -149,12 +145,13 @@ contract OpportunityFactory is Ownable, Pausable, ReentrancyGuard {
         emit FeeWithdrawn(feeRecipient, amount);
     }
     
-    // Pause functionality
     function pause() external onlyOwner {
         _pause();
+        emit Paused(msg.sender);
     }
     
     function unpause() external onlyOwner {
         _unpause();
+        emit Unpaused(msg.sender);
     }
 }

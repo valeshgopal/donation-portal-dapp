@@ -12,6 +12,7 @@ export interface OpportunityCardProps {
   featured?: boolean;
   showStopButton?: boolean;
   totalUserDonation?: number;
+  minEthPrice?: number;
 }
 
 export function OpportunityCard({
@@ -22,6 +23,7 @@ export function OpportunityCard({
   featured,
   showStopButton = true,
   totalUserDonation,
+  minEthPrice = 0,
 }: OpportunityCardProps) {
   const [isUpdating, setIsUpdating] = useState(false);
   const [donationAmount, setDonationAmount] = useState('');
@@ -135,10 +137,12 @@ export function OpportunityCard({
               <input
                 type='number'
                 step='1'
-                min='0.001'
+                min={minEthPrice}
                 value={donationAmount}
                 onChange={(e) => setDonationAmount(e.target.value)}
-                placeholder='Amount in ETH (min: 0.001)'
+                placeholder={`Amount in ETH ${
+                  minEthPrice > 0 ? 'min: ' + minEthPrice : ''
+                }`}
                 className='flex-1 border rounded-md px-3 py-2'
                 disabled={isProcessingDonation || !opportunity.active}
               />

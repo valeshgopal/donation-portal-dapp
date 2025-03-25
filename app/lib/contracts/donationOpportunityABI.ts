@@ -69,43 +69,6 @@ export const donationOpportunityABI = [
   },
   {
     inputs: [],
-    name: 'getDonors',
-    outputs: [
-      {
-        internalType: 'address[]',
-        name: '',
-        type: 'address[]',
-      },
-    ],
-    stateMutability: 'view',
-    type: 'function',
-  },
-  {
-    inputs: [
-      {
-        internalType: 'uint256',
-        name: '_page',
-        type: 'uint256',
-      },
-      {
-        internalType: 'uint256',
-        name: '_pageSize',
-        type: 'uint256',
-      },
-    ],
-    name: 'getDonorsPaginated',
-    outputs: [
-      {
-        internalType: 'address[]',
-        name: '',
-        type: 'address[]',
-      },
-    ],
-    stateMutability: 'view',
-    type: 'function',
-  },
-  {
-    inputs: [],
     name: 'getOpportunityDetails',
     outputs: [
       {

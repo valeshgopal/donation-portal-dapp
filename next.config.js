@@ -2,7 +2,18 @@
 const nextConfig = {
     reactStrictMode: true,
     images: {
-        domains: ['ipfs.io', 'images.unsplash.com'], // Allow IPFS gateway for images and Unsplash
+        remotePatterns: [
+            {
+                protocol: 'https',
+                hostname: 'ipfs.io',
+                pathname: '**',
+            },
+            {
+                protocol: 'https',
+                hostname: 'images.unsplash.com',
+                pathname: '**',
+            },
+        ]
     },
     webpack: (config) => {
         config.resolve.fallback = {

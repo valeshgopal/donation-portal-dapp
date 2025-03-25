@@ -9,6 +9,7 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@chainlink/contracts": "^1.3.0",
     "@rainbow-me/rainbowkit": "^2.2.4",
     "@tanstack/react-query": "^5.68.0",
     "@web3-storage/w3up-client": "^17.2.0",

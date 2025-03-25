@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { OpportunityCard } from '../components/OpportunityCard';
 import { useDonationOpportunities } from '../hooks/useDonationOpportunities';
 import { Opportunity } from '../lib/contracts/types';
+import { useEthPrice } from '../hooks/useEthPrice';
 
 type TabType = 'created' | 'donated';
 
@@ -20,6 +21,7 @@ export default function DashboardPage() {
   >([]);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const donationOpportunities = useDonationOpportunities();
+  const { minEthPrice } = useEthPrice();
 
   useEffect(() => {
     // Check for success message in sessionStorage
@@ -164,6 +166,7 @@ export default function DashboardPage() {
               onDonate={handleDonate}
               showStopButton={false}
               totalUserDonation={opportunity.totalUserDonation}
+              minEthPrice={minEthPrice}
             />
           ))}
         </div>

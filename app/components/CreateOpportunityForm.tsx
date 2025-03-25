@@ -7,9 +7,8 @@ import { useAccount, useTransaction } from 'wagmi';
 import { uploadFileToIPFS } from '../lib/ipfs';
 import { isAddress } from 'viem';
 import { useOpportunityFactory } from '../hooks/useOpportunityFactory';
-import { sepolia } from 'wagmi/chains';
-import Link from 'next/link';
 import toast, { Toaster } from 'react-hot-toast';
+import { useEthPrice } from '../hooks/useEthPrice';
 
 type VerificationDocument = {
   file: File;
@@ -263,6 +262,7 @@ export function CreateOpportunityForm() {
   const router = useRouter();
   const { address } = useAccount();
   const opportunityFactory = useOpportunityFactory();
+  const { minEthPrice } = useEthPrice(1000);
   const [txHash, setTxHash] = useState<`0x${string}` | undefined>();
   const { isSuccess } = useTransaction({ hash: txHash });
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -323,8 +323,8 @@ export function CreateOpportunityForm() {
       case 'fundingGoal':
         return !value
           ? 'Funding goal is required'
-          : parseFloat(value) < 0.1
-          ? 'Funding goal must be at least 0.1 ETH'
+          : parseFloat(value) < minEthPrice
+          ? `Funding goal must be at least ${minEthPrice} ETH`
           : undefined;
       case 'recipientWallet':
         return !value.trim()
@@ -557,7 +557,6 @@ export function CreateOpportunityForm() {
       });
       setUploadProgress({ kyc: 0, proof: 0 });
       setCreationStage('idle');
-      setError(`Error during upload process: ${uploadError}`);
       throw new Error(
         `Upload failed: ${
           uploadError instanceof Error ? uploadError.message : 'Unknown error'
@@ -772,8 +771,11 @@ export function CreateOpportunityForm() {
             id='fundingGoal'
             value={formData.fundingGoal}
             onChange={(e) => handleFieldChange('fundingGoal', e.target.value)}
-            step='0.01'
-            min='0'
+            step='1'
+            // min={minEthPrice}
+            placeholder={`Amount in ETH (${
+              minEthPrice > 0 ? 'min: ' + minEthPrice : ''
+            })`}
             className={`mt-1 block w-full rounded-md shadow-sm p-3 outline-none focus:ring-primary focus:border-primary ${
               validationErrors.fundingGoal
                 ? 'border-red-300'
