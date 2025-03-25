@@ -136,7 +136,7 @@ export function OpportunityCard({
             <div className="flex gap-2">
               <input
                 type="number"
-                step="1"
+                step="any"
                 min={minEthPrice}
                 value={donationAmount}
                 onChange={(e) => setDonationAmount(e.target.value)}
