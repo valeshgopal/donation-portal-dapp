@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { verifyFractalWebhook } from "@/lib/fractal";
+import { verifyFractalWebhook } from "../../lib/fractal";
 import dbConnect from "../../lib/mongodb";
 import { KYCVerification } from "../../lib/models/KYCVerification";
 
