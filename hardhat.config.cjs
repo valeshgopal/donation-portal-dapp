@@ -1,11 +1,11 @@
-require('@nomicfoundation/hardhat-toolbox');
-require('dotenv').config();
+require("@nomicfoundation/hardhat-toolbox");
+require("dotenv").config();
 
-const SEPOLIA_URL = process.env.NEXT_PUBLIC_SEPOLIA_RPC_URL || '';
+const SEPOLIA_URL = process.env.NEXT_PUBLIC_RPC_URL || "";
 
 const config = {
   solidity: {
-    version: '0.8.20',
+    version: "0.8.20",
     settings: {
       optimizer: {
         enabled: true,
