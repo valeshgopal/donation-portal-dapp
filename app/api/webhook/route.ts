@@ -6,7 +6,7 @@ import { KYCVerification } from "../../lib/models/KYCVerification";
 export async function POST(request: Request) {
   try {
     // Get the webhook secret from environment variables
-    const webhookSecret = process.env.FRACTAL_WEBHOOK_SECRET;
+    const webhookSecret = process.env.NEXT_PUBLIC_FRACTAL_WEBHOOK_SECRET;
     if (!webhookSecret) {
       throw new Error("FRACTAL_WEBHOOK_SECRET is not configured");
     }

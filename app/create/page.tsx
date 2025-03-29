@@ -17,9 +17,10 @@ export default function CreateOpportunityPage() {
           </div>
         }
       >
-        <KYCVerification />
+        <KYCVerification>
+          <CreateOpportunityForm />
+        </KYCVerification>
       </Suspense>
-      <CreateOpportunityForm />
     </div>
   );
 }

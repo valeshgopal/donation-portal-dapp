@@ -1,7 +1,7 @@
 "use client";
 
 import { useAccount } from "wagmi";
-import { useEffect, useState } from "react";
+import { useEffect, useState, ReactNode } from "react";
 import { useSearchParams } from "next/navigation";
 
 interface KYCStatus {
@@ -10,7 +10,11 @@ interface KYCStatus {
   data: any;
 }
 
-export default function KYCVerification() {
+interface KYCVerificationProps {
+  children: ReactNode;
+}
+
+export default function KYCVerification({ children }: KYCVerificationProps) {
   const { address, isConnected } = useAccount();
   const [kycStatus, setKYCStatus] = useState<KYCStatus | null>(null);
   const [isPolling, setIsPolling] = useState(false);
@@ -116,11 +120,10 @@ export default function KYCVerification() {
                 process.env.NEXT_PUBLIC_FRACTAL_KYC_URL +
                 `&ensure_wallet=${address}`
               }
-              target="_blank"
               rel="noopener noreferrer"
               className="inline-block bg-primary text-white px-6 py-3 rounded-md hover:bg-primary/90 transition-colors cursor-pointer"
             >
-              Verify with Fractal
+              Verify KYC
             </a>
           </div>
         </div>
@@ -148,5 +151,6 @@ export default function KYCVerification() {
     );
   }
 
-  return null;
+  // Only render children when KYC is verified
+  return <>{children}</>;
 }
