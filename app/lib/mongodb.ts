@@ -9,11 +9,11 @@ declare global {
   var mongoose: { conn: null; promise: null } | CachedType;
 }
 
-if (!process.env.MONGODB_URI) {
-  throw new Error("Please add your MONGODB_URI to .env");
+if (!process.env.NEXT_PUBLIC_MONGODB_URI) {
+  throw new Error("Please add your NEXT_PUBLIC_MONGODB_URI to .env");
 }
 
-const MONGODB_URI: string = process.env.MONGODB_URI;
+const NEXT_PUBLIC_MONGODB_URI: string = process.env.NEXT_PUBLIC_MONGODB_URI;
 
 let cached = global.mongoose || { conn: null, promise: null };
 
@@ -29,7 +29,7 @@ async function dbConnect() {
 
     cached = global.mongoose = {
       conn: null,
-      promise: mongoose.connect(MONGODB_URI, opts),
+      promise: mongoose.connect(NEXT_PUBLIC_MONGODB_URI, opts),
     };
   }
 
