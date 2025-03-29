@@ -1,9 +1,18 @@
 import mongoose, { Schema, Document } from "mongoose";
 
+export type VerificationStatus =
+  | "Not Started"
+  | "In Progress"
+  | "Approved"
+  | "Declined"
+  | "In Review"
+  | "Expired"
+  | "Abandoned"
+  | "Kyc Expired";
+
 export interface IKYCVerification extends Document {
   walletAddress: string;
-  isVerified: boolean;
-  status: "pending" | "approved" | "rejected";
+  status: VerificationStatus;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -14,16 +23,20 @@ const kycVerificationSchema = new Schema(
       type: String,
       required: true,
       unique: true,
-      lowercase: true,
-    },
-    isVerified: {
-      type: Boolean,
-      default: false,
     },
     status: {
       type: String,
-      enum: ["pending", "approved", "rejected"],
-      default: "pending",
+      enum: [
+        "Not Started",
+        "In Progress",
+        "Approved",
+        "Declined",
+        "In Review",
+        "Expired",
+        "Abandoned",
+        "Kyc Expired",
+      ],
+      default: "Not Started",
     },
   },
   {

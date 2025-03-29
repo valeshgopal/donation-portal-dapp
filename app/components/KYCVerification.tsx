@@ -3,11 +3,12 @@
 import { useAccount } from "wagmi";
 import { useEffect, useState, ReactNode } from "react";
 import { useSearchParams } from "next/navigation";
+import { createSession } from "../lib/didit/createSession";
+import { VerificationStatus } from "../lib/models/KYCVerification";
 
 interface KYCStatus {
   exists: boolean;
-  isVerified: boolean;
-  status: "pending" | "approved" | "rejected";
+  status: VerificationStatus;
   data: any;
 }
 
@@ -15,11 +16,126 @@ interface KYCVerificationProps {
   children: ReactNode;
 }
 
+interface StatusConfig {
+  title: string;
+  message: string;
+  showButton: boolean;
+  buttonText: string;
+  buttonDisabled: boolean;
+  showSpinner: boolean;
+}
+
+const getStatusConfig = (
+  status: VerificationStatus | undefined,
+  isCreatingSession: boolean
+): StatusConfig => {
+  if (isCreatingSession) {
+    return {
+      title: "Creating KYC Session",
+      message: "Please wait while we set up your verification session.",
+      showButton: true,
+      buttonText: "Creating KYC Session",
+      buttonDisabled: true,
+      showSpinner: true,
+    };
+  }
+
+  switch (status) {
+    case "Not Started":
+      return {
+        title: "KYC Verification Required",
+        message:
+          "Please complete your KYC verification before creating a donation opportunity.",
+        showButton: true,
+        buttonText: "Verify KYC",
+        buttonDisabled: false,
+        showSpinner: false,
+      };
+    case "In Progress":
+      return {
+        title: "KYC Verification in Progress",
+        message:
+          "Please complete the verification process in the Didit window.",
+        showButton: true,
+        buttonText: "Verification in Progress",
+        buttonDisabled: true,
+        showSpinner: true,
+      };
+    case "Approved":
+      return {
+        title: "KYC Verification Approved",
+        message: "Your KYC verification has been approved.",
+        showButton: false,
+        buttonText: "",
+        buttonDisabled: true,
+        showSpinner: false,
+      };
+    case "Declined":
+      return {
+        title: "KYC Verification Declined",
+        message:
+          "Your KYC verification was declined. Please try again with valid documents.",
+        showButton: true,
+        buttonText: "Try Again",
+        buttonDisabled: false,
+        showSpinner: false,
+      };
+    case "In Review":
+      return {
+        title: "KYC Under Review",
+        message:
+          "Your documents are being reviewed. This process may take up to 24 hours.",
+        showButton: true,
+        buttonText: "Under Review",
+        buttonDisabled: true,
+        showSpinner: true,
+      };
+    case "Expired":
+      return {
+        title: "KYC Verification Expired",
+        message:
+          "Your verification session has expired. Please start a new verification process.",
+        showButton: true,
+        buttonText: "Start New Verification",
+        buttonDisabled: false,
+        showSpinner: false,
+      };
+    case "Abandoned":
+      return {
+        title: "KYC Verification Incomplete",
+        message:
+          "You didn't complete the verification process. Please try again.",
+        showButton: true,
+        buttonText: "Restart Verification",
+        buttonDisabled: false,
+        showSpinner: false,
+      };
+    case "Kyc Expired":
+      return {
+        title: "KYC Verification Expired",
+        message:
+          "Your KYC verification has expired. Please complete the verification process again.",
+        showButton: true,
+        buttonText: "Renew Verification",
+        buttonDisabled: false,
+        showSpinner: false,
+      };
+    default:
+      return {
+        title: "Checking KYC Status",
+        message: "Please wait while we verify your KYC status.",
+        showButton: false,
+        buttonText: "",
+        buttonDisabled: true,
+        showSpinner: true,
+      };
+  }
+};
+
 export default function KYCVerification({ children }: KYCVerificationProps) {
   const { address, isConnected } = useAccount();
   const [kycStatus, setKYCStatus] = useState<KYCStatus | null>(null);
-  const [isPolling, setIsPolling] = useState(false);
-  const [isVerificationPending, setIsVerificationPending] = useState(false);
+  const [isCreatingSession, setIsCreatingSession] = useState(false);
   const searchParams = useSearchParams();
 
   const checkKYCStatus = async () => {
@@ -36,61 +152,35 @@ export default function KYCVerification({ children }: KYCVerificationProps) {
     }
   };
 
-  useEffect(() => {
-    // Check if we have an authorization code from Fractal
-    const code = searchParams.get("code");
-    if (code) {
-      // Set verification as pending in localStorage
-      localStorage.setItem(`kyc_pending_${address}`, "true");
-      setIsVerificationPending(true);
+  const handleCreateSession = async () => {
+    setIsCreatingSession(true);
+    try {
+      const data = await createSession(
+        "OCR + FACE",
+        `${process.env.NEXT_PUBLIC_DOMAIN_URL}/create`,
+        address as string
+      );
 
-      // Start polling for KYC status
-      setIsPolling(true);
-      let attempts = 0;
-      const maxAttempts = 10; // 20 seconds total (2 seconds * 10 attempts)
-
-      const pollStatus = async () => {
-        const status = await checkKYCStatus();
-        attempts++;
-
-        // Stop polling if:
-        // 1. The wallet exists in DB and is verified
-        // 2. The wallet exists in DB but is not verified (failed verification)
-        // 3. We've reached max attempts
-        if (status?.exists || attempts >= maxAttempts) {
-          setIsPolling(false);
-          // If verification is complete, remove from localStorage
-          if (status?.exists) {
-            localStorage.removeItem(`kyc_pending_${address}`);
-            setIsVerificationPending(false);
-          }
-          return;
-        }
-
-        // Poll every 2 seconds
-        setTimeout(pollStatus, 2000);
-      };
-
-      pollStatus();
-    } else {
-      // Check localStorage for pending verification
-      const isPending = localStorage.getItem(`kyc_pending_${address}`);
-      if (isPending === "true") {
-        setIsVerificationPending(true);
+      if (data.url) {
+        window.location.href = data.url;
       }
-      // If no code, check status immediately
-      checkKYCStatus();
+    } catch (error) {
+      console.error("Error creating session:", error);
+    } finally {
+      setIsCreatingSession(false);
     }
-  }, [address, searchParams]);
+  };
 
-  // Handle error from Fractal
+  useEffect(() => {
+    const pollInterval = setInterval(checkKYCStatus, 5000);
+    checkKYCStatus();
+
+    return () => clearInterval(pollInterval);
+  }, [address]);
+
+  // Handle error from Didit
   const error = searchParams.get("error");
   if (error) {
-    // Clear pending status on error
-    if (address) {
-      localStorage.removeItem(`kyc_pending_${address}`);
-      setIsVerificationPending(false);
-    }
     return (
       <div className="container mx-auto px-4 py-8">
         <div className="text-center">
@@ -102,7 +192,7 @@ export default function KYCVerification({ children }: KYCVerificationProps) {
               "The verification process was not completed."}
           </p>
           <button
-            onClick={() => (window.location.href = "/create")}
+            onClick={handleCreateSession}
             className="inline-block bg-primary text-white px-6 py-3 rounded-md hover:bg-primary/90 transition-colors cursor-pointer"
           >
             Try Again
@@ -125,87 +215,32 @@ export default function KYCVerification({ children }: KYCVerificationProps) {
     );
   }
 
-  // Show verification required if:
-  // 1. No KYC record exists
-  // 2. KYC is not verified
-  // 3. Status is rejected
-  if (
-    kycStatus?.exists === false ||
-    kycStatus?.isVerified === false ||
-    kycStatus?.status === "rejected"
-  ) {
+  const statusConfig = getStatusConfig(kycStatus?.status, isCreatingSession);
+
+  // Show status message for all states except Approved
+  if (kycStatus?.status !== "Approved") {
     return (
       <div className="container mx-auto px-4 py-8">
         <div className="text-center">
-          <h1 className="text-2xl font-bold mb-4">KYC Verification Required</h1>
-          <p className="text-gray-600 mb-6">
-            {kycStatus?.status === "rejected"
-              ? "Your KYC verification was rejected. Please try again."
-              : isVerificationPending
-              ? "Your verification is being processed. Please wait while we check your status."
-              : "Please complete your KYC verification before creating a donation opportunity."}
-          </p>
+          <h1 className="text-2xl font-bold mb-4">{statusConfig.title}</h1>
+          <p className="text-gray-600 mb-6">{statusConfig.message}</p>
 
-          <div className="flex flex-col items-center gap-4 mb-8">
-            {isVerificationPending ? (
+          {statusConfig.showButton && (
+            <div className="flex flex-col items-center gap-4 mb-8">
               <button
-                disabled
-                className="inline-block bg-gray-400 text-white px-6 py-3 rounded-md cursor-not-allowed flex items-center gap-2"
+                onClick={handleCreateSession}
+                disabled={statusConfig.buttonDisabled}
+                className={`inline-block px-6 py-3 rounded-md flex items-center gap-2 ${
+                  statusConfig.buttonDisabled
+                    ? "bg-gray-400 cursor-not-allowed"
+                    : "bg-primary hover:bg-primary/90 cursor-pointer"
+                } text-white transition-colors`}
               >
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                Verification in Progress
+                {statusConfig.showSpinner && (
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                )}
+                {statusConfig.buttonText}
               </button>
-            ) : (
-              <a
-                href={
-                  process.env.NEXT_PUBLIC_FRACTAL_KYC_URL +
-                  `&ensure_wallet=${address}`
-                }
-                rel="noopener noreferrer"
-                className="inline-block bg-primary text-white px-6 py-3 rounded-md hover:bg-primary/90 transition-colors cursor-pointer"
-              >
-                Verify KYC
-              </a>
-            )}
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // Show pending status if verification is in progress
-  if (kycStatus?.status === "pending" || isVerificationPending) {
-    return (
-      <div className="container mx-auto px-4 py-8">
-        <div className="text-center">
-          <h1 className="text-2xl font-bold mb-4">
-            KYC Verification in Progress
-          </h1>
-          <p className="text-gray-600 mb-6">
-            Your KYC verification is currently being reviewed. We will notify
-            you once it's completed. This process may take up to 24 hours.
-          </p>
-          <div className="mt-4">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (kycStatus === null || isPolling) {
-    return (
-      <div className="container mx-auto px-4 py-8">
-        <div className="text-center">
-          <h1 className="text-2xl font-bold mb-4">Checking KYC Status...</h1>
-          <p className="text-gray-600">
-            {isPolling
-              ? "Please wait while we verify your KYC status. This may take up to 20 seconds."
-              : "Please wait while we verify your KYC status."}
-          </p>
-          {isPolling && (
-            <div className="mt-4">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
             </div>
           )}
         </div>
@@ -213,20 +248,6 @@ export default function KYCVerification({ children }: KYCVerificationProps) {
     );
   }
 
-  // Only render children when KYC is verified AND status is approved
-  if (kycStatus?.isVerified && kycStatus?.status === "approved") {
-    return <>{children}</>;
-  }
-
-  // Fallback case - should not be reached due to above conditions
-  return (
-    <div className="container mx-auto px-4 py-8">
-      <div className="text-center">
-        <h1 className="text-2xl font-bold mb-4">Verification Required</h1>
-        <p className="text-gray-600">
-          Please complete your KYC verification to proceed.
-        </p>
-      </div>
-    </div>
-  );
+  // Only render children when status is Approved
+  return <>{children}</>;
 }
