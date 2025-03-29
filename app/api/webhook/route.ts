@@ -39,7 +39,7 @@ export async function POST(request: Request) {
         // Update KYC status in database
         await KYCVerification.findOneAndUpdate(
           { walletAddress: walletAddress.toLowerCase() },
-          { isVerified: true },
+          { isVerified: true, status: "approved" },
           { new: true, upsert: true }
         );
 
@@ -56,11 +56,27 @@ export async function POST(request: Request) {
         // Update KYC status in database
         await KYCVerification.findOneAndUpdate(
           { walletAddress: rejectedWalletAddress.toLowerCase() },
-          { isVerified: false },
+          { isVerified: false, status: "rejected" },
           { new: true, upsert: true }
         );
 
         console.log("KYC Verification Rejected:", {
+          userId: payload.data.user_id,
+          timestamp: payload.data.timestamp,
+        });
+        return NextResponse.json({ success: true });
+      case "verification_contacted":
+        // Get the user's wallet address from the user_id
+        const contactedWalletAddress = payload.data.user_id;
+
+        // Update KYC status in database
+        await KYCVerification.findOneAndUpdate(
+          { walletAddress: contactedWalletAddress.toLowerCase() },
+          { isVerified: false, status: "pending" },
+          { new: true, upsert: true }
+        );
+
+        console.log("KYC Verification Contacted:", {
           userId: payload.data.user_id,
           timestamp: payload.data.timestamp,
         });
