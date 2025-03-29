@@ -16,14 +16,14 @@ export async function GET(request: NextRequest) {
     await dbConnect();
 
     const kycStatus = await KYCVerification.findOne({
-      walletAddress: walletAddress.toLowerCase(),
+      walletAddress: walletAddress,
     });
 
-    // Return more detailed status information
+    // Return status information
     return NextResponse.json(
       {
         exists: !!kycStatus,
-        isVerified: kycStatus?.isVerified ?? false,
+        status: kycStatus?.status ?? "Not Started",
         data: kycStatus,
       },
       { status: 200 }
@@ -40,7 +40,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { walletAddress, isVerified } = body;
+    const { walletAddress, status } = body;
 
     if (!walletAddress) {
       return NextResponse.json(
@@ -52,15 +52,15 @@ export async function POST(request: NextRequest) {
     await dbConnect();
 
     const kycStatus = await KYCVerification.findOneAndUpdate(
-      { walletAddress: walletAddress.toLowerCase() },
-      { isVerified },
+      { walletAddress: walletAddress },
+      { status },
       { new: true, upsert: true }
     );
 
     return NextResponse.json(
       {
         exists: true,
-        isVerified: kycStatus.isVerified,
+        status: kycStatus.status,
         data: kycStatus,
       },
       { status: 200 }
