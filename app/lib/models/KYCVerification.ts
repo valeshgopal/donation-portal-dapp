@@ -3,6 +3,7 @@ import mongoose, { Schema, Document } from "mongoose";
 export interface IKYCVerification extends Document {
   walletAddress: string;
   isVerified: boolean;
+  status: "pending" | "approved" | "rejected";
   createdAt: Date;
   updatedAt: Date;
 }
@@ -18,6 +19,11 @@ const kycVerificationSchema = new Schema(
     isVerified: {
       type: Boolean,
       default: false,
+    },
+    status: {
+      type: String,
+      enum: ["pending", "approved", "rejected"],
+      default: "pending",
     },
   },
   {

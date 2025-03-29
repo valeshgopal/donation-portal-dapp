@@ -7,6 +7,7 @@ import { useSearchParams } from "next/navigation";
 interface KYCStatus {
   exists: boolean;
   isVerified: boolean;
+  status: "pending" | "approved" | "rejected";
   data: any;
 }
 
@@ -104,14 +105,23 @@ export default function KYCVerification({ children }: KYCVerificationProps) {
     );
   }
 
-  if (kycStatus?.exists === false || kycStatus?.isVerified === false) {
+  // Show verification required if:
+  // 1. No KYC record exists
+  // 2. KYC is not verified
+  // 3. Status is rejected
+  if (
+    kycStatus?.exists === false ||
+    kycStatus?.isVerified === false ||
+    kycStatus?.status === "rejected"
+  ) {
     return (
       <div className="container mx-auto px-4 py-8">
         <div className="text-center">
           <h1 className="text-2xl font-bold mb-4">KYC Verification Required</h1>
           <p className="text-gray-600 mb-6">
-            Please complete your KYC verification before creating a donation
-            opportunity.
+            {kycStatus?.status === "rejected"
+              ? "Your KYC verification was rejected. Please try again."
+              : "Please complete your KYC verification before creating a donation opportunity."}
           </p>
 
           <div className="flex flex-col items-center gap-4 mb-8">
@@ -125,6 +135,26 @@ export default function KYCVerification({ children }: KYCVerificationProps) {
             >
               Verify KYC
             </a>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Show pending status if verification is in progress
+  if (kycStatus?.status === "pending") {
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold mb-4">
+            KYC Verification in Progress
+          </h1>
+          <p className="text-gray-600 mb-6">
+            Your KYC verification is currently being reviewed. We will notify
+            you once it's completed. This process may take up to 24 hours.
+          </p>
+          <div className="mt-4">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
           </div>
         </div>
       </div>
@@ -151,6 +181,20 @@ export default function KYCVerification({ children }: KYCVerificationProps) {
     );
   }
 
-  // Only render children when KYC is verified
-  return <>{children}</>;
+  // Only render children when KYC is verified AND status is approved
+  if (kycStatus?.isVerified && kycStatus?.status === "approved") {
+    return <>{children}</>;
+  }
+
+  // Fallback case - should not be reached due to above conditions
+  return (
+    <div className="container mx-auto px-4 py-8">
+      <div className="text-center">
+        <h1 className="text-2xl font-bold mb-4">Verification Required</h1>
+        <p className="text-gray-600">
+          Please complete your KYC verification to proceed.
+        </p>
+      </div>
+    </div>
+  );
 }
