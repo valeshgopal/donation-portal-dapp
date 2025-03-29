@@ -572,8 +572,8 @@ export function CreateOpportunityForm() {
             id="fundingGoal"
             value={formData.fundingGoal}
             onChange={(e) => handleFieldChange("fundingGoal", e.target.value)}
-            step="1"
-            // min={minEthPrice}
+            step="any"
+            min={minEthPrice}
             placeholder={`Amount in ETH (${
               minEthPrice > 0 ? "min: " + minEthPrice : ""
             })`}
