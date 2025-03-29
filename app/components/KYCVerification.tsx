@@ -19,6 +19,7 @@ export default function KYCVerification({ children }: KYCVerificationProps) {
   const { address, isConnected } = useAccount();
   const [kycStatus, setKYCStatus] = useState<KYCStatus | null>(null);
   const [isPolling, setIsPolling] = useState(false);
+  const [isVerificationPending, setIsVerificationPending] = useState(false);
   const searchParams = useSearchParams();
 
   const checkKYCStatus = async () => {
@@ -39,6 +40,10 @@ export default function KYCVerification({ children }: KYCVerificationProps) {
     // Check if we have an authorization code from Fractal
     const code = searchParams.get("code");
     if (code) {
+      // Set verification as pending in localStorage
+      localStorage.setItem(`kyc_pending_${address}`, "true");
+      setIsVerificationPending(true);
+
       // Start polling for KYC status
       setIsPolling(true);
       let attempts = 0;
@@ -54,6 +59,11 @@ export default function KYCVerification({ children }: KYCVerificationProps) {
         // 3. We've reached max attempts
         if (status?.exists || attempts >= maxAttempts) {
           setIsPolling(false);
+          // If verification is complete, remove from localStorage
+          if (status?.exists) {
+            localStorage.removeItem(`kyc_pending_${address}`);
+            setIsVerificationPending(false);
+          }
           return;
         }
 
@@ -63,6 +73,11 @@ export default function KYCVerification({ children }: KYCVerificationProps) {
 
       pollStatus();
     } else {
+      // Check localStorage for pending verification
+      const isPending = localStorage.getItem(`kyc_pending_${address}`);
+      if (isPending === "true") {
+        setIsVerificationPending(true);
+      }
       // If no code, check status immediately
       checkKYCStatus();
     }
@@ -71,6 +86,11 @@ export default function KYCVerification({ children }: KYCVerificationProps) {
   // Handle error from Fractal
   const error = searchParams.get("error");
   if (error) {
+    // Clear pending status on error
+    if (address) {
+      localStorage.removeItem(`kyc_pending_${address}`);
+      setIsVerificationPending(false);
+    }
     return (
       <div className="container mx-auto px-4 py-8">
         <div className="text-center">
@@ -121,20 +141,32 @@ export default function KYCVerification({ children }: KYCVerificationProps) {
           <p className="text-gray-600 mb-6">
             {kycStatus?.status === "rejected"
               ? "Your KYC verification was rejected. Please try again."
+              : isVerificationPending
+              ? "Your verification is being processed. Please wait while we check your status."
               : "Please complete your KYC verification before creating a donation opportunity."}
           </p>
 
           <div className="flex flex-col items-center gap-4 mb-8">
-            <a
-              href={
-                process.env.NEXT_PUBLIC_FRACTAL_KYC_URL +
-                `&ensure_wallet=${address}`
-              }
-              rel="noopener noreferrer"
-              className="inline-block bg-primary text-white px-6 py-3 rounded-md hover:bg-primary/90 transition-colors cursor-pointer"
-            >
-              Verify KYC
-            </a>
+            {isVerificationPending ? (
+              <button
+                disabled
+                className="inline-block bg-gray-400 text-white px-6 py-3 rounded-md cursor-not-allowed flex items-center gap-2"
+              >
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                Verification in Progress
+              </button>
+            ) : (
+              <a
+                href={
+                  process.env.NEXT_PUBLIC_FRACTAL_KYC_URL +
+                  `&ensure_wallet=${address}`
+                }
+                rel="noopener noreferrer"
+                className="inline-block bg-primary text-white px-6 py-3 rounded-md hover:bg-primary/90 transition-colors cursor-pointer"
+              >
+                Verify KYC
+              </a>
+            )}
           </div>
         </div>
       </div>
@@ -142,7 +174,7 @@ export default function KYCVerification({ children }: KYCVerificationProps) {
   }
 
   // Show pending status if verification is in progress
-  if (kycStatus?.status === "pending") {
+  if (kycStatus?.status === "pending" || isVerificationPending) {
     return (
       <div className="container mx-auto px-4 py-8">
         <div className="text-center">
