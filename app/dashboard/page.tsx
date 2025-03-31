@@ -1,36 +1,67 @@
-'use client';
+"use client";
 
-import { useEffect, useState } from 'react';
-import { useAccount } from 'wagmi';
-import Link from 'next/link';
-import { OpportunityCard } from '../components/OpportunityCard';
-import { useDonationOpportunities } from '../hooks/useDonationOpportunities';
-import { Opportunity } from '../lib/contracts/types';
-import { useEthPrice } from '../hooks/useEthPrice';
+import { useEffect, useState } from "react";
+import { useAccount } from "wagmi";
+import Link from "next/link";
+import { OpportunityCard } from "../components/OpportunityCard";
+import { useDonationOpportunities } from "../hooks/useDonationOpportunities";
+import { Opportunity } from "../lib/contracts/types";
+import { useEthPrice } from "../hooks/useEthPrice";
 
-type TabType = 'created' | 'donated';
+// Helper function to get Sepolia explorer URLs
+const getExplorerUrl = (type: "tx" | "address", hash: string) => {
+  return `https://sepolia.etherscan.io/${type}/${hash}`;
+};
+
+type TabType = "created" | "donated";
 
 export default function DashboardPage() {
   const { address } = useAccount();
-  const [activeTab, setActiveTab] = useState<TabType>('created');
+  const [activeTab, setActiveTab] = useState<TabType>("created");
   const [donatedOpportunities, setDonatedOpportunities] = useState<
     Opportunity[]
   >([]);
   const [createdOpportunities, setCreatedOpportunities] = useState<
     Opportunity[]
   >([]);
-  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<
+    string | JSX.Element | null
+  >(null);
   const donationOpportunities = useDonationOpportunities();
   const { minEthPrice } = useEthPrice();
 
   useEffect(() => {
     // Check for success message in sessionStorage
-    const createdOpportunity = sessionStorage.getItem('opportunityCreated');
-    if (createdOpportunity) {
-      setSuccessMessage(
-        `"${createdOpportunity}" has been created successfully! It may take a few minutes to appear in your dashboard.`
-      );
-      sessionStorage.removeItem('opportunityCreated');
+    const createdOpportunityStr = sessionStorage.getItem("opportunityCreated");
+    if (createdOpportunityStr) {
+      try {
+        const { title, txHash } = JSON.parse(createdOpportunityStr);
+        setSuccessMessage(
+          <div>
+            <p>
+              "{title}" has been created successfully! It may take a few minutes
+              to appear in your dashboard.
+            </p>
+            <p className="text-sm mt-2">
+              Transaction:{" "}
+              <a
+                href={getExplorerUrl("tx", txHash)}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-primary hover:underline"
+              >
+                View on Etherscan
+              </a>
+            </p>
+          </div>
+        );
+        sessionStorage.removeItem("opportunityCreated");
+      } catch (error) {
+        console.error("Error parsing opportunity data:", error);
+        setSuccessMessage(
+          "Opportunity created successfully! It may take a few minutes to appear in your dashboard."
+        );
+      }
     }
   }, []);
 
@@ -63,8 +94,8 @@ export default function DashboardPage() {
         setDonatedOpportunities(opportunities);
       }
     } catch (error) {
-      console.error('Error donating:', error);
-      throw new Error('Failed to process donation. Please try again.');
+      console.error("Error donating:", error);
+      throw new Error("Failed to process donation. Please try again.");
     }
   };
 
@@ -79,15 +110,15 @@ export default function DashboardPage() {
         setCreatedOpportunities(created);
       }
     } catch (error) {
-      console.error('Error stopping campaign:', error);
+      console.error("Error stopping campaign:", error);
     }
   };
 
   if (donationOpportunities.isLoading) {
     return (
-      <div className='animate-pulse grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 my-12 mx-4'>
+      <div className="animate-pulse grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 my-12 mx-4">
         {[1, 2, 3].map((i) => (
-          <div key={i} className='h-96 w-356 bg-gray-200 rounded-lg'></div>
+          <div key={i} className="h-96 w-356 bg-gray-200 rounded-lg"></div>
         ))}
       </div>
     );
@@ -95,12 +126,12 @@ export default function DashboardPage() {
 
   if (!address) {
     return (
-      <div className='container mx-auto px-4 py-16'>
-        <div className='text-center'>
-          <h1 className='text-3xl font-bold text-gray-900 mb-4'>
+      <div className="container mx-auto px-4 py-16">
+        <div className="text-center">
+          <h1 className="text-3xl font-bold text-gray-900 mb-4">
             Connect Your Wallet
           </h1>
-          <p className='text-gray-600 mb-8'>
+          <p className="text-gray-600 mb-8">
             Please connect your wallet to view your dashboard.
           </p>
         </div>
@@ -109,45 +140,45 @@ export default function DashboardPage() {
   }
 
   const opportunities =
-    activeTab === 'created' ? createdOpportunities : donatedOpportunities;
+    activeTab === "created" ? createdOpportunities : donatedOpportunities;
   const emptyMessage =
-    activeTab === 'created' ? 'No Created Opportunities' : 'No Donations Yet';
+    activeTab === "created" ? "No Created Opportunities" : "No Donations Yet";
   const emptyDescription =
-    activeTab === 'created'
+    activeTab === "created"
       ? "You haven't created any opportunities yet. Create your first one!"
       : "You haven't made any donations yet. Browse opportunities to start donating!";
   const emptyActionLink =
-    activeTab === 'created' ? '/create' : '/opportunities';
+    activeTab === "created" ? "/create" : "/opportunities";
   const emptyActionText =
-    activeTab === 'created' ? 'Create Opportunity' : 'Browse Opportunities';
+    activeTab === "created" ? "Create Opportunity" : "Browse Opportunities";
 
   return (
-    <div className='container mx-auto px-4 py-8'>
+    <div className="container mx-auto px-4 py-8">
       {successMessage && (
-        <div className='mb-6 bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-md'>
+        <div className="mb-6 bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-md">
           {successMessage}
         </div>
       )}
 
-      <div className='flex flex-col md:flex-row justify-between items-center mb-8'>
-        <h1 className='text-2xl md:text-3xl font-bold'>My Dashboard</h1>
-        <div className='flex items-center gap-4 mt-4 md:mt-0 bg-gray-100 p-1 rounded-lg'>
+      <div className="flex flex-col md:flex-row justify-between items-center mb-8">
+        <h1 className="text-2xl md:text-3xl font-bold">My Dashboard</h1>
+        <div className="flex items-center gap-4 mt-4 md:mt-0 bg-gray-100 p-1 rounded-lg">
           <button
-            onClick={() => setActiveTab('created')}
+            onClick={() => setActiveTab("created")}
             className={`px-4 py-2 rounded-md transition-all ${
-              activeTab === 'created'
-                ? 'bg-white shadow text-primary'
-                : 'text-gray-600 hover:text-primary'
+              activeTab === "created"
+                ? "bg-white shadow text-primary"
+                : "text-gray-600 hover:text-primary"
             }`}
           >
             Created
           </button>
           <button
-            onClick={() => setActiveTab('donated')}
+            onClick={() => setActiveTab("donated")}
             className={`px-4 py-2 rounded-md transition-all ${
-              activeTab === 'donated'
-                ? 'bg-white shadow text-primary'
-                : 'text-gray-600 hover:text-primary'
+              activeTab === "donated"
+                ? "bg-white shadow text-primary"
+                : "text-gray-600 hover:text-primary"
             }`}
           >
             Donated
@@ -156,7 +187,7 @@ export default function DashboardPage() {
       </div>
 
       {opportunities.length > 0 ? (
-        <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6'>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {opportunities.map((opportunity) => (
             <OpportunityCard
               key={opportunity.id.toString()}
@@ -171,14 +202,14 @@ export default function DashboardPage() {
           ))}
         </div>
       ) : (
-        <div className='text-center py-12 bg-white rounded-lg shadow-sm'>
-          <h2 className='text-xl font-semibold text-gray-900 mb-2'>
+        <div className="text-center py-12 bg-white rounded-lg shadow-sm">
+          <h2 className="text-xl font-semibold text-gray-900 mb-2">
             {emptyMessage}
           </h2>
-          <p className='text-gray-600 mb-8'>{emptyDescription}</p>
+          <p className="text-gray-600 mb-8">{emptyDescription}</p>
           <Link
             href={emptyActionLink}
-            className='inline-block px-6 py-3 bg-primary text-white rounded-md hover:bg-primary/90 transition-colors'
+            className="inline-block px-6 py-3 bg-primary text-white rounded-md hover:bg-primary/90 transition-colors"
           >
             {emptyActionText}
           </Link>

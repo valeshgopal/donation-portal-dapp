@@ -108,8 +108,8 @@ export const getStatusConfig = (
       return {
         title: "Checking KYC Status",
         message: "Please wait while we verify your KYC status.",
-        showButton: false,
-        buttonText: "",
+        showButton: true,
+        buttonText: "Please wait",
         buttonDisabled: true,
         showSpinner: true,
       };
