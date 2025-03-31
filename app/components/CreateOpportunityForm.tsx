@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useRef } from "react";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAccount, useTransaction } from "wagmi";
@@ -9,6 +9,7 @@ import { useOpportunityFactory } from "../hooks/useOpportunityFactory";
 import toast, { Toaster } from "react-hot-toast";
 import { useEthPrice } from "../hooks/useEthPrice";
 import { countries } from "../lib/countries";
+import { uploadToIPFS } from "../lib/ipfs";
 
 // List of causes
 const causes = [
@@ -72,9 +73,10 @@ export function CreateOpportunityForm() {
   const [validationErrors, setValidationErrors] = useState<ValidationErrors>(
     {}
   );
-  const [creationStage, setCreationStage] = useState<"idle" | "deploying">(
-    "idle"
-  );
+  const [creationStage, setCreationStage] = useState<
+    "idle" | "uploading" | "deploying"
+  >("idle");
+  const toastIdRef = useRef<string | undefined>();
 
   const validateField = (
     name: keyof typeof formData,
@@ -92,6 +94,8 @@ export function CreateOpportunityForm() {
           ? "Summary is required"
           : value.length < 10
           ? "Summary must be at least 10 characters"
+          : value.trim().split(/\s+/).length > 50
+          ? "Summary must be less than 50 words"
           : undefined;
       case "description": {
         if (!value.trim()) return "Description is required";
@@ -160,17 +164,58 @@ export function CreateOpportunityForm() {
     setIsSubmitting(true);
     setError("");
 
-    const toastId = toast.loading("Starting to create your opportunity...");
+    toastIdRef.current = toast.loading(
+      "Starting to create your opportunity..."
+    );
 
     try {
       if (!formData.recipientWallet) {
         throw new Error("Recipient wallet is required");
       }
 
-      setCreationStage("deploying");
-      toast.loading("Creating your opportunity...", { id: toastId });
+      // First stage: Upload metadata to IPFS
+      setCreationStage("uploading");
+      toast.loading("Uploading metadata to IPFS...", {
+        id: toastIdRef.current,
+      });
 
-      // Deploy opportunity contract
+      const metadata = {
+        title: formData.title,
+        summary: formData.summary,
+        description: formData.description,
+        location: formData.location,
+        cause: formData.cause,
+      };
+
+      let metaDataURI: string;
+      try {
+        // Create a promise that rejects after 30 seconds
+        const timeoutPromise = new Promise((_, reject) => {
+          setTimeout(() => {
+            reject(new Error("Upload operation timed out. Please try again."));
+          }, 60000);
+        });
+
+        // Race between the upload and the timeout
+        metaDataURI = (await Promise.race([
+          uploadToIPFS(metadata),
+          timeoutPromise,
+        ])) as string;
+      } catch (error) {
+        const errorMessage =
+          error instanceof Error
+            ? error.message
+            : "Failed to upload metadata to IPFS. Please try again.";
+        toast.error(errorMessage, {
+          id: toastIdRef.current,
+        });
+        return;
+      }
+
+      // Second stage: Deploy contract
+      setCreationStage("deploying");
+      toast.loading("Creating your opportunity...", { id: toastIdRef.current });
+
       if (!opportunityFactory) {
         throw new Error("Opportunity factory contract is not initialized");
       }
@@ -179,23 +224,17 @@ export function CreateOpportunityForm() {
         formData.title,
         formData.fundingGoal,
         formData.recipientWallet as `0x${string}`,
-        formData.description // Using description as metadata for now
+        metaDataURI // Using IPFS hash as metadata
       );
 
       setTxHash(tx as `0x${string}`);
-      toast.success(
-        "Transaction created successfully! Please Wait for confirmation.",
-        { id: toastId }
-      );
+      toast.loading("Transaction submitted. Waiting for confirmation...", {
+        id: toastIdRef.current,
+      });
     } catch (error) {
       toast.error("Failed to create opportunity. Please try again.", {
-        id: toastId,
+        id: toastIdRef.current,
       });
-      setError(
-        `Error creating opportunity: ${
-          error instanceof Error ? error.message : "Unknown error"
-        }`
-      );
     } finally {
       setIsSubmitting(false);
       setCreationStage("idle");
@@ -208,6 +247,8 @@ export function CreateOpportunityForm() {
     switch (creationStage) {
       case "deploying":
         return "Deploying Contract...";
+      case "uploading":
+        return "Uploading Metadata...";
       default:
         return "Creating...";
     }
@@ -215,8 +256,14 @@ export function CreateOpportunityForm() {
 
   useEffect(() => {
     if (isSuccess && txHash) {
-      // Store success message in sessionStorage
-      sessionStorage.setItem("opportunityCreated", formData.title);
+      // Store success message and transaction hash in sessionStorage
+      sessionStorage.setItem(
+        "opportunityCreated",
+        JSON.stringify({
+          title: formData.title,
+          txHash: txHash,
+        })
+      );
       // Redirect to dashboard
       router.push("/dashboard");
     }
