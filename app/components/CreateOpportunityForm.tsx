@@ -4,17 +4,11 @@ import React from "react";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAccount, useTransaction } from "wagmi";
-import { uploadFileToIPFS } from "../lib/ipfs";
 import { isAddress } from "viem";
 import { useOpportunityFactory } from "../hooks/useOpportunityFactory";
 import toast, { Toaster } from "react-hot-toast";
 import { useEthPrice } from "../hooks/useEthPrice";
 import { countries } from "../lib/countries";
-
-type VerificationDocument = {
-  file: File;
-  type: "kyc" | "proof";
-};
 
 // List of causes
 const causes = [
@@ -50,8 +44,6 @@ type ValidationErrors = {
   cause?: string;
   fundingGoal?: string;
   recipientWallet?: string;
-  kyc?: string;
-  proof?: string;
 };
 
 // Helper function to get Sepolia explorer URLs
@@ -76,21 +68,13 @@ export function CreateOpportunityForm() {
     fundingGoal: "",
     recipientWallet: "",
   });
-  const [documents, setDocuments] = useState<VerificationDocument[]>([]);
   const [error, setError] = useState("");
   const [validationErrors, setValidationErrors] = useState<ValidationErrors>(
     {}
   );
-  const [uploadProgress, setUploadProgress] = useState<{
-    kyc: number;
-    proof: number;
-  }>({
-    kyc: 0,
-    proof: 0,
-  });
-  const [creationStage, setCreationStage] = useState<
-    "idle" | "uploading_docs" | "uploading_metadata" | "deploying"
-  >("idle");
+  const [creationStage, setCreationStage] = useState<"idle" | "deploying">(
+    "idle"
+  );
 
   const validateField = (
     name: keyof typeof formData,
@@ -158,73 +142,8 @@ export function CreateOpportunityForm() {
       }
     });
 
-    // Validate KYC documents
-    if (!documents.some((d) => d.type === "kyc")) {
-      errors.kyc = "At least one verification document is required";
-    }
-
-    // Validate Proof documents
-    if (!documents.some((d) => d.type === "proof")) {
-      errors.proof = "At least one proof document is required";
-    }
-
     setValidationErrors(errors);
     return Object.keys(errors).length === 0;
-  };
-
-  const handleDocumentUpload = (
-    e: React.ChangeEvent<HTMLInputElement>,
-    type: "kyc" | "proof"
-  ) => {
-    const files = e.target.files;
-    if (!files?.length) return;
-
-    const file = files[0];
-    const maxSize = 1024 * 1024; // 1MB in bytes
-
-    if (file.size > maxSize) {
-      setValidationErrors((prev) => ({
-        ...prev,
-        [type]: `File size must not exceed 1MB. Current size: ${(
-          file.size /
-          (1024 * 1024)
-        ).toFixed(2)}MB`,
-      }));
-      return;
-    }
-
-    const newDoc: VerificationDocument = {
-      file: file,
-      type,
-    };
-
-    setDocuments([...documents, newDoc]);
-    // Clear the validation error if it exists
-    setValidationErrors((prev) => ({
-      ...prev,
-      [type]: undefined,
-    }));
-  };
-
-  const removeDocument = (index: number) => {
-    const updatedDocs = documents.filter((_, i) => i !== index);
-    setDocuments(updatedDocs);
-
-    // Clear validation errors when all documents of a type are removed
-    const kycDocs = updatedDocs.filter((d) => d.type === "kyc");
-    const proofDocs = updatedDocs.filter((d) => d.type === "proof");
-
-    setValidationErrors((prev) => ({
-      ...prev,
-      kyc:
-        kycDocs.length === 0
-          ? "At least one verification document is required"
-          : undefined,
-      proof:
-        proofDocs.length === 0
-          ? "At least one proof document is required"
-          : undefined,
-    }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -244,123 +163,37 @@ export function CreateOpportunityForm() {
     const toastId = toast.loading("Starting to create your opportunity...");
 
     try {
-      // Upload documents to IPFS
-      const kycDocs: { ipfsHash: string; fileType: string; type: string }[] =
-        [];
-      const proofDocs: { ipfsHash: string; fileType: string; type: string }[] =
-        [];
-
-      if (
-        !formData.recipientWallet ||
-        !documents.some((d) => d.type === "kyc") ||
-        !documents.some((d) => d.type === "proof")
-      ) {
-        throw new Error(
-          "Recipient wallet, verification document, and proof document are required"
-        );
+      if (!formData.recipientWallet) {
+        throw new Error("Recipient wallet is required");
       }
 
-      setCreationStage("uploading_docs");
-      toast.loading("Uploading verification documents...", { id: toastId });
+      setCreationStage("deploying");
+      toast.loading("Creating your opportunity...", { id: toastId });
 
-      // Upload KYC documents
-      for (const doc of documents.filter((d) => d.type === "kyc")) {
-        const ipfsHash = await uploadFileToIPFS(doc.file);
-        kycDocs.push({
-          ipfsHash,
-          fileType: doc.file.type,
-          type: "kyc",
-        });
-        setUploadProgress((prev) => ({
-          ...prev,
-          kyc:
-            prev.kyc + 100 / documents.filter((d) => d.type === "kyc").length,
-        }));
+      // Deploy opportunity contract
+      if (!opportunityFactory) {
+        throw new Error("Opportunity factory contract is not initialized");
       }
 
-      toast.loading("Uploading proof documents...", { id: toastId });
+      const tx = await opportunityFactory.createOpportunity(
+        formData.title,
+        formData.fundingGoal,
+        formData.recipientWallet as `0x${string}`,
+        formData.description // Using description as metadata for now
+      );
 
-      // Upload Proof documents
-      for (const doc of documents.filter((d) => d.type === "proof")) {
-        const ipfsHash = await uploadFileToIPFS(doc.file);
-        proofDocs.push({
-          ipfsHash,
-          fileType: doc.file.type,
-          type: "proof",
-        });
-        setUploadProgress((prev) => ({
-          ...prev,
-          proof:
-            prev.proof +
-            100 / documents.filter((d) => d.type === "proof").length,
-        }));
-      }
-
-      try {
-        setCreationStage("uploading_metadata");
-        toast.loading("Preparing your opportunity...", { id: toastId });
-
-        // Create metadata
-        const metadata = {
-          title: formData.title,
-          summary: formData.summary,
-          description: formData.description,
-          location: formData.location,
-          cause: formData.cause,
-          kyc: kycDocs,
-          proofs: proofDocs,
-        };
-
-        // Upload metadata to IPFS
-        const metadataBlob = new Blob([JSON.stringify(metadata)], {
-          type: "application/json",
-        });
-        const metadataFile = new File([metadataBlob], "metadata.json", {
-          type: "application/json",
-        });
-
-        const metadataURI = await uploadFileToIPFS(metadataFile);
-
-        setCreationStage("deploying");
-        toast.loading("Creating your opportunity...", { id: toastId });
-
-        // Deploy opportunity contract
-        if (!opportunityFactory) {
-          throw new Error("Opportunity factory contract is not initialized");
-        }
-
-        const tx = await opportunityFactory.createOpportunity(
-          formData.title,
-          formData.fundingGoal,
-          formData.recipientWallet as `0x${string}`,
-          metadataURI
-        );
-
-        setTxHash(tx as `0x${string}`);
-        toast.success("Opportunity created successfully!", { id: toastId });
-      } catch (metadataError) {
-        toast.error("Failed to create opportunity. Please try again.", {
-          id: toastId,
-        });
-        setError(`Error uploading metadata: ${metadataError}`);
-        throw new Error(
-          `Failed to upload metadata: ${
-            metadataError instanceof Error
-              ? metadataError.message
-              : "Unknown error"
-          }`
-        );
-      }
-    } catch (uploadError) {
-      // Reset progress on error
-      toast.error("Failed to upload documents. Please try again.", {
+      setTxHash(tx as `0x${string}`);
+      toast.success(
+        "Transaction created successfully! Please Wait for confirmation.",
+        { id: toastId }
+      );
+    } catch (error) {
+      toast.error("Failed to create opportunity. Please try again.", {
         id: toastId,
       });
-      setUploadProgress({ kyc: 0, proof: 0 });
-      setCreationStage("idle");
-      throw new Error(
-        `Upload failed: ${
-          uploadError instanceof Error ? uploadError.message : "Unknown error"
+      setError(
+        `Error creating opportunity: ${
+          error instanceof Error ? error.message : "Unknown error"
         }`
       );
     } finally {
@@ -373,10 +206,6 @@ export function CreateOpportunityForm() {
     if (!isSubmitting) return "Create Opportunity";
 
     switch (creationStage) {
-      case "uploading_docs":
-        return "Uploading Documents...";
-      case "uploading_metadata":
-        return "Uploading Metadata...";
       case "deploying":
         return "Deploying Contract...";
       default:
@@ -386,7 +215,6 @@ export function CreateOpportunityForm() {
 
   useEffect(() => {
     if (isSuccess && txHash) {
-      // toast.success('Opportunity created successfully!');
       // Store success message in sessionStorage
       sessionStorage.setItem("opportunityCreated", formData.title);
       // Redirect to dashboard
@@ -621,151 +449,18 @@ export function CreateOpportunityForm() {
           )}
         </div>
 
-        <div className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Verification Documents
-              <span className="text-xs text-gray-400">*</span>
-              <span className="text-xs text-gray-500 ml-2">
-                (Max size: 1MB)
-              </span>
-            </label>
-            <div className="space-y-4">
-              <div className="relative">
-                <input
-                  type="file"
-                  onChange={(e) => handleDocumentUpload(e, "kyc")}
-                  accept=".pdf,.jpg,.jpeg,.png"
-                  className={`block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-primary file:text-white hover:file:bg-primary/90 ${
-                    validationErrors.kyc ? "border-red-300" : ""
-                  }`}
-                  required={!documents.some((d) => d.type === "kyc")}
-                />
-                {documents
-                  .filter((d) => d.type === "kyc")
-                  .map((doc, index) => (
-                    <div
-                      key={index}
-                      className="mt-2 flex items-center justify-between bg-gray-50 p-2 rounded-md"
-                    >
-                      <div className="flex-1 flex items-center space-x-2">
-                        <span className="text-sm text-gray-600">
-                          {doc.file.name}
-                        </span>
-                        <span className="text-xs text-gray-500">
-                          ({(doc.file.size / (1024 * 1024)).toFixed(2)}MB)
-                        </span>
-                        {isSubmitting && uploadProgress.kyc > 0 && (
-                          <div className="flex-1 ml-4">
-                            <div className="w-full bg-gray-200 rounded-full h-1.5">
-                              <div
-                                className="bg-primary h-1.5 rounded-full transition-all duration-300"
-                                style={{ width: `${uploadProgress.kyc}%` }}
-                              />
-                            </div>
-                            <span className="text-xs text-gray-500 mt-1">
-                              {uploadProgress.kyc}%
-                            </span>
-                          </div>
-                        )}
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => removeDocument(index)}
-                        disabled={isSubmitting}
-                        className="text-red-600 hover:text-red-800 text-sm px-2 py-1 rounded-md hover:bg-red-50 disabled:opacity-50"
-                      >
-                        Remove
-                      </button>
-                    </div>
-                  ))}
-              </div>
-            </div>
-            {validationErrors.kyc && (
-              <p className="mt-1 text-sm text-red-600">
-                {validationErrors.kyc}
-              </p>
-            )}
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Proof Documents
-              <span className="text-xs text-gray-400">*</span>
-              <span className="text-xs text-gray-500 ml-2">
-                (Max size: 1MB)
-              </span>
-            </label>
-            <div className="space-y-4">
-              <div className="relative">
-                <input
-                  type="file"
-                  onChange={(e) => handleDocumentUpload(e, "proof")}
-                  accept=".pdf,.jpg,.jpeg,.png"
-                  className={`block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-primary file:text-white hover:file:bg-primary/90 ${
-                    validationErrors.proof ? "border-red-300" : ""
-                  }`}
-                  required={!documents.some((d) => d.type === "proof")}
-                />
-                {documents
-                  .filter((d) => d.type === "proof")
-                  .map((doc, index) => (
-                    <div
-                      key={index}
-                      className="mt-2 flex items-center justify-between bg-gray-50 p-2 rounded-md"
-                    >
-                      <div className="flex-1 flex items-center space-x-2">
-                        <span className="text-sm text-gray-600">
-                          {doc.file.name}
-                        </span>
-                        <span className="text-xs text-gray-500">
-                          ({(doc.file.size / (1024 * 1024)).toFixed(2)}MB)
-                        </span>
-                        {isSubmitting && uploadProgress.proof > 0 && (
-                          <div className="flex-1 ml-4">
-                            <div className="w-full bg-gray-200 rounded-full h-1.5">
-                              <div
-                                className="bg-primary h-1.5 rounded-full transition-all duration-300"
-                                style={{ width: `${uploadProgress.proof}%` }}
-                              />
-                            </div>
-                            <span className="text-xs text-gray-500 mt-1">
-                              {uploadProgress.proof}%
-                            </span>
-                          </div>
-                        )}
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => removeDocument(index)}
-                        disabled={isSubmitting}
-                        className="text-red-600 hover:text-red-800 text-sm px-2 py-1 rounded-md hover:bg-red-50 disabled:opacity-50"
-                      >
-                        Remove
-                      </button>
-                    </div>
-                  ))}
-              </div>
-            </div>
-            {validationErrors.proof && (
-              <p className="mt-1 text-sm text-red-600">
-                {validationErrors.proof}
-              </p>
-            )}
-          </div>
-          <div>
-            <input
-              type="checkbox"
-              id="terms"
-              name="terms"
-              required
-              onChange={(e) => {}}
-            />
-            <label htmlFor="terms" className="ml-2 text-sm text-gray-600">
-              I acknowledge that 5% is a platform fee, and I will receive 95% of
-              the donation.
-            </label>
-          </div>
+        <div>
+          <input
+            type="checkbox"
+            id="terms"
+            name="terms"
+            required
+            onChange={(e) => {}}
+          />
+          <label htmlFor="terms" className="ml-2 text-sm text-gray-600">
+            I acknowledge that 5% is a platform fee, and I will receive 95% of
+            the donation.
+          </label>
         </div>
 
         <button
