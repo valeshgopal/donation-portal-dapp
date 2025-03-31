@@ -6,9 +6,9 @@ import { KYCVerification } from "../../lib/models/KYCVerification";
 export async function POST(request: Request) {
   try {
     // Get the webhook secret from environment variables
-    const webhookSecret = process.env.NEXT_PUBLIC_DIDIT_WEBHOOK_SECRET_KEY;
+    const webhookSecret = process.env.NEXT_PUBLIC_DIDIT_WEBHOOK_SECRET;
     if (!webhookSecret) {
-      throw new Error("NEXT_PUBLIC_DIDIT_WEBHOOK_SECRET_KEY is not configured");
+      throw new Error("NEXT_PUBLIC_DIDIT_WEBHOOK_SECRET is not configured");
     }
 
     // Get the raw body
