@@ -3,8 +3,8 @@
 import { useAccount } from "wagmi";
 import { useEffect, useState, ReactNode } from "react";
 import { useSearchParams } from "next/navigation";
-import { createSession } from "../lib/didit/createSession";
 import { VerificationStatus } from "../lib/models/KYCVerification";
+import { getStatusConfig } from "@/lib/statusConfig";
 
 interface KYCStatus {
   exists: boolean;
@@ -16,127 +16,12 @@ interface KYCVerificationProps {
   children: ReactNode;
 }
 
-interface StatusConfig {
-  title: string;
-  message: string;
-  showButton: boolean;
-  buttonText: string;
-  buttonDisabled: boolean;
-  showSpinner: boolean;
-}
-
-const getStatusConfig = (
-  status: VerificationStatus | undefined,
-  isCreatingSession: boolean
-): StatusConfig => {
-  if (isCreatingSession) {
-    return {
-      title: "Creating KYC Session",
-      message: "Please wait while we set up your verification session.",
-      showButton: true,
-      buttonText: "Creating KYC Session",
-      buttonDisabled: true,
-      showSpinner: true,
-    };
-  }
-
-  switch (status) {
-    case "Not Started":
-      return {
-        title: "KYC Verification Required",
-        message:
-          "Please complete your KYC verification before creating a donation opportunity.",
-        showButton: true,
-        buttonText: "Verify KYC",
-        buttonDisabled: false,
-        showSpinner: false,
-      };
-    case "In Progress":
-      return {
-        title: "KYC Verification in Progress",
-        message:
-          "Please complete the verification process in the Didit window.",
-        showButton: true,
-        buttonText: "Verification in Progress",
-        buttonDisabled: true,
-        showSpinner: true,
-      };
-    case "Approved":
-      return {
-        title: "KYC Verification Approved",
-        message: "Your KYC verification has been approved.",
-        showButton: false,
-        buttonText: "",
-        buttonDisabled: true,
-        showSpinner: false,
-      };
-    case "Declined":
-      return {
-        title: "KYC Verification Declined",
-        message:
-          "Your KYC verification was declined. Please try again with valid documents.",
-        showButton: true,
-        buttonText: "Try Again",
-        buttonDisabled: false,
-        showSpinner: false,
-      };
-    case "In Review":
-      return {
-        title: "KYC Under Review",
-        message:
-          "Your documents are being reviewed. This process may take up to 24 hours.",
-        showButton: true,
-        buttonText: "Under Review",
-        buttonDisabled: true,
-        showSpinner: true,
-      };
-    case "Expired":
-      return {
-        title: "KYC Verification Expired",
-        message:
-          "Your verification session has expired. Please start a new verification process.",
-        showButton: true,
-        buttonText: "Start New Verification",
-        buttonDisabled: false,
-        showSpinner: false,
-      };
-    case "Abandoned":
-      return {
-        title: "KYC Verification Incomplete",
-        message:
-          "You didn't complete the verification process. Please try again.",
-        showButton: true,
-        buttonText: "Restart Verification",
-        buttonDisabled: false,
-        showSpinner: false,
-      };
-    case "Kyc Expired":
-      return {
-        title: "KYC Verification Expired",
-        message:
-          "Your KYC verification has expired. Please complete the verification process again.",
-        showButton: true,
-        buttonText: "Renew Verification",
-        buttonDisabled: false,
-        showSpinner: false,
-      };
-    default:
-      return {
-        title: "Checking KYC Status",
-        message: "Please wait while we verify your KYC status.",
-        showButton: false,
-        buttonText: "",
-        buttonDisabled: true,
-        showSpinner: true,
-      };
-  }
-};
-
 export default function KYCVerification({ children }: KYCVerificationProps) {
   const { address, isConnected } = useAccount();
   const [kycStatus, setKYCStatus] = useState<KYCStatus | null>(null);
   const [isCreatingSession, setIsCreatingSession] = useState(false);
   const searchParams = useSearchParams();
+  const [error, setError] = useState(false);
 
   const checkKYCStatus = async () => {
     if (!address) return;
@@ -155,17 +40,30 @@ export default function KYCVerification({ children }: KYCVerificationProps) {
   const handleCreateSession = async () => {
     setIsCreatingSession(true);
     try {
-      const data = await createSession(
-        "OCR + FACE",
-        `${process.env.NEXT_PUBLIC_DOMAIN_URL}/create`,
-        address as string
-      );
+      const response = await fetch("/api/didit/create-session", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          features: "OCR + FACE",
+          callback: `${process.env.NEXT_PUBLIC_DOMAIN_URL}/create`,
+          vendor_data: address,
+        }),
+      });
 
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to create session");
+      }
+
+      const data = await response.json();
       if (data.url) {
         window.location.href = data.url;
       }
     } catch (error) {
       console.error("Error creating session:", error);
+      setError(true);
     } finally {
       setIsCreatingSession(false);
     }
@@ -179,7 +77,6 @@ export default function KYCVerification({ children }: KYCVerificationProps) {
   }, [address]);
 
   // Handle error from Didit
-  const error = searchParams.get("error");
   if (error) {
     return (
       <div className="container mx-auto px-4 py-8">
