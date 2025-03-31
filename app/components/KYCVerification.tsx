@@ -4,7 +4,7 @@ import { useAccount } from "wagmi";
 import { useEffect, useState, ReactNode } from "react";
 import { useSearchParams } from "next/navigation";
 import { VerificationStatus } from "../lib/models/KYCVerification";
-import { getStatusConfig } from "@/lib/statusConfig";
+import { getStatusConfig } from "../lib/statusConfig";
 
 interface KYCStatus {
   exists: boolean;
