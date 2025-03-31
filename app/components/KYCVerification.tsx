@@ -58,10 +58,9 @@ export default function KYCVerification({ children }: KYCVerificationProps) {
       }
 
       const data = await response.json();
-      console.log({ data });
-      // if (data.url) {
-      //   window.location.href = data.url;
-      // }
+      if (data.url) {
+        window.location.href = data.url;
+      }
     } catch (error) {
       console.error("Error creating session:", error);
       setError(true);
