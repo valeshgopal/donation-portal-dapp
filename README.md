@@ -14,10 +14,10 @@ A transparent and secure platform connecting cryptocurrency donors with verified
 ## Tech Stack
 
 - **Frontend**: Next.js 14, React 18, TailwindCSS
-- **Backend**: Supabase, Prisma ORM
+- **Backend**: MongoDB, mongoose
 - **Blockchain**: Ethereum, Ethers.js
 - **Storage**: IPFS (web3.storage)
-- **Authentication**: Wallet Connect, Supabase Auth
+- **Authentication**: Wallet Connect
 
 ## Getting Started
 
@@ -30,10 +30,10 @@ A transparent and secure platform connecting cryptocurrency donors with verified
 2. Set up environment variables:
 
    ```bash
-   cp .env.example .env.local
+   cp .env.example .env
    ```
 
-   Fill in your environment variables in `.env.local`
+   Fill in your environment variables in `.env`
 
 3. Run the development server:
 
@@ -53,7 +53,6 @@ A transparent and secure platform connecting cryptocurrency donors with verified
 │   ├── lib/           # Utility functions
 │   └── types/         # TypeScript types
 ├── contracts/          # Smart contracts
-├── prisma/            # Database schema
 └── public/            # Static assets
 ```
 
