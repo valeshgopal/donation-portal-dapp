@@ -473,7 +473,7 @@ export function CreateOpportunityForm() {
           <input
             type="text"
             id="recipientWallet"
-            value={address}
+            value={formData.recipientWallet}
             disabled
             onChange={(e) =>
               handleFieldChange("recipientWallet", e.target.value)
