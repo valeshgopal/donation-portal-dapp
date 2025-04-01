@@ -67,7 +67,7 @@ export function CreateOpportunityForm() {
     location: "",
     cause: "",
     fundingGoal: "",
-    recipientWallet: "",
+    recipientWallet: address || "",
   });
   const [error, setError] = useState("");
   const [validationErrors, setValidationErrors] = useState<ValidationErrors>(
@@ -116,11 +116,7 @@ export function CreateOpportunityForm() {
           ? `Funding goal must be at least ${minEthPrice} ETH`
           : undefined;
       case "recipientWallet":
-        return !value.trim()
-          ? "Recipient wallet address is required"
-          : !isAddress(value as `0x${string}`)
-          ? "Invalid wallet address"
-          : undefined;
+        return !address ? "Recipient wallet address is required" : undefined;
       default:
         return undefined;
     }
@@ -478,11 +474,12 @@ export function CreateOpportunityForm() {
             type="text"
             id="recipientWallet"
             value={formData.recipientWallet}
+            disabled
             onChange={(e) =>
               handleFieldChange("recipientWallet", e.target.value)
             }
             placeholder="Wallet address"
-            className={`mt-1 block w-full rounded-md shadow-sm p-3 outline-none focus:ring-primary focus:border-primary ${
+            className={`mt-1 block w-full text-gray-500 rounded-md shadow-sm p-3 outline-none focus:ring-primary focus:border-primary ${
               validationErrors.recipientWallet
                 ? "border-red-300"
                 : "border-gray-300"
