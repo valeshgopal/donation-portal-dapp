@@ -228,17 +228,17 @@ function OpportunityContent() {
                     Make a Donation
                   </h2>
                   <form onSubmit={handleDonate} className="space-y-4">
-                    <div className="flex gap-2">
+                    <div className="flex flex-col sm:flex-row gap-2">
                       <input
                         type="number"
                         step="any"
                         min={minEthPrice}
                         value={donationAmount}
                         onChange={(e) => setDonationAmount(e.target.value)}
-                        placeholder={`Amount in ETH (${
+                        placeholder={`${
                           minEthPrice > 0 ? "min: " + minEthPrice : ""
-                        })`}
-                        className="flex-1 border rounded-md px-3 py-2"
+                        } ETH`}
+                        className="w-full sm:flex-1 border rounded-md px-3 py-2 text-sm sm:text-base"
                         disabled={isProcessingDonation || !opportunity.active}
                       />
                       <button
@@ -249,7 +249,7 @@ function OpportunityContent() {
                           isProcessingDonation ||
                           !opportunity.active
                         }
-                        className="bg-primary text-white px-6 py-2 rounded-md hover:bg-primary/90 disabled:opacity-50"
+                        className="w-full sm:w-auto bg-primary text-white px-4 py-2 rounded-md hover:bg-primary/90 disabled:opacity-50 text-sm sm:text-base whitespace-nowrap"
                       >
                         {isProcessingDonation
                           ? "Processing..."
