@@ -51,7 +51,6 @@ contract OpportunityFactory is Ownable, Pausable, ReentrancyGuard {
             _recipientWallet,
             msg.sender,
             _metadataURI,
-            feeRecipient,
             address(this)
         );
         

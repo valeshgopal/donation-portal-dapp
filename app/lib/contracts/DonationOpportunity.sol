@@ -27,9 +27,9 @@ contract DonationOpportunity is ReentrancyGuard, Ownable, Pausable {
     uint256 public createdAt;
     uint256 public lastWithdrawRequest;
     
-    address public feeRecipient;
     address public factory;
     uint256 public totalFeesCollected;
+    bool public withdrawalRequested;
 
     mapping(address => UserDonation[]) public userDonations;
     address[] public donors;
@@ -44,7 +44,6 @@ contract DonationOpportunity is ReentrancyGuard, Ownable, Pausable {
     event OpportunityStatusChanged(bool active);
     event FundsWithdrawn(address indexed recipient, uint256 amount);
     event FeeTransferred(address indexed feeRecipient, uint256 amount);
-    event FeeRecipientUpdated(address indexed newFeeRecipient);
 
     modifier onlyCreator() {
         require(msg.sender == creatorAddress, "Only creator can call this");
@@ -57,13 +56,11 @@ contract DonationOpportunity is ReentrancyGuard, Ownable, Pausable {
         address _recipientWallet,
         address _creatorAddress,
         string memory _metadataURI,
-        address _feeRecipient,
         address _factory
     ) {
         require(_fundingGoal > 0, "Funding goal must be greater than 0");
         require(_recipientWallet != address(0), "Invalid recipient address");
         require(_creatorAddress != address(0), "Invalid creator address");
-        require(_feeRecipient != address(0), "Invalid fee recipient address");
         require(_factory != address(0), "Invalid factory address");
         require(bytes(_title).length > 0, "Title cannot be empty");
 
@@ -72,7 +69,6 @@ contract DonationOpportunity is ReentrancyGuard, Ownable, Pausable {
         recipientWallet = _recipientWallet;
         creatorAddress = _creatorAddress;
         metadataURI = _metadataURI;
-        feeRecipient = _feeRecipient;
         factory = _factory;
         active = true;
         createdAt = block.timestamp;
@@ -84,15 +80,24 @@ contract DonationOpportunity is ReentrancyGuard, Ownable, Pausable {
         require(active, "Opportunity is not active");
         require(msg.value >= MIN_DONATION, "Donation amount too small");
 
-        // Calculate fee (5%)
-        uint256 fee = (msg.value * FEE_PERCENTAGE) / FEE_DENOMINATOR;
-        uint256 recipientAmount = msg.value - fee;
+        uint256 acceptedAmount = msg.value;
+        uint256 refundAmount = 0;
+    
+        // Check if donation would exceed funding goal
+        if (currentRaised + msg.value > fundingGoal) {
+            acceptedAmount = fundingGoal - currentRaised;
+            refundAmount = msg.value - acceptedAmount;
+        }
 
-        currentRaised += msg.value;
+        // Calculate fee (5%) on the accepted amount only
+        uint256 fee = (acceptedAmount * FEE_PERCENTAGE) / FEE_DENOMINATOR;
+        uint256 recipientAmount = acceptedAmount - fee;
+
+        currentRaised += acceptedAmount;
         totalFeesCollected += fee;
 
         userDonations[msg.sender].push(UserDonation({
-            amount: msg.value,
+            amount: acceptedAmount,
             timestamp: block.timestamp
         }));
 
@@ -102,22 +107,28 @@ contract DonationOpportunity is ReentrancyGuard, Ownable, Pausable {
             donors.push(msg.sender);
         }
 
-        // Send fee to factory contract AFTER state updates
+        // Refund excess amount if necessary
+        if (refundAmount > 0) {
+            (bool refundSuccess, ) = msg.sender.call{value: refundAmount}("");
+            require(refundSuccess, "Refund transfer failed");
+        }
+
+         // Send fee to factory contract
         (bool feeSuccess, ) = address(factory).call{value: fee}("");
         require(feeSuccess, "Fee transfer failed");
         emit FeeTransferred(factory, fee);
 
-        // Send remaining amount to recipient AFTER state updates
+        // Send remaining amount to recipient
         (bool recipientSuccess, ) = recipientWallet.call{value: recipientAmount}("");
         require(recipientSuccess, "Recipient transfer failed");
 
-        emit DonationReceived(msg.sender, msg.value, block.timestamp, fee);
-    }
-
-    function updateFeeRecipient(address _newFeeRecipient) external onlyOwner {
-        require(_newFeeRecipient != address(0), "Invalid fee recipient address");
-        feeRecipient = _newFeeRecipient;
-        emit FeeRecipientUpdated(_newFeeRecipient);
+        emit DonationReceived(msg.sender, acceptedAmount, block.timestamp, fee);
+    
+        // Automatically deactivate if goal is reached
+        if (currentRaised >= fundingGoal && active) {
+            active = false;
+            emit OpportunityStatusChanged(false);
+        }
     }
 
     function stopOpportunity() external onlyCreator {
@@ -134,10 +145,16 @@ contract DonationOpportunity is ReentrancyGuard, Ownable, Pausable {
 
     function requestEmergencyWithdraw() external onlyOwner {
         lastWithdrawRequest = block.timestamp;
+        withdrawalRequested = true;
     }   
 
     function emergencyWithdraw() external onlyOwner nonReentrant {
+        require(withdrawalRequested, "No withdrawal requested");
         require(block.timestamp >= lastWithdrawRequest + WITHDRAW_DELAY, "Timelock active");
+
+        // Reset the request flag
+        withdrawalRequested = false;
+
         address ownerAddress = owner();
         require(ownerAddress != address(0), "Owner is zero address");
 
@@ -168,8 +185,7 @@ contract DonationOpportunity is ReentrancyGuard, Ownable, Pausable {
         bool _active,
         uint256 _createdAt,
         uint256 _donorCount,
-        uint256 _totalFeesCollected,
-        address _feeRecipient
+        uint256 _totalFeesCollected
     ) {
         return (
             title,
@@ -181,12 +197,11 @@ contract DonationOpportunity is ReentrancyGuard, Ownable, Pausable {
             active,
             createdAt,
             donors.length,
-            totalFeesCollected,
-            feeRecipient
+            totalFeesCollected
         );
     }
 
-        function pause() external onlyOwner {
+    function pause() external onlyOwner {
         _pause();
         emit Paused(msg.sender);
     }
