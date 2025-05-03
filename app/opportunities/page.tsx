@@ -9,6 +9,7 @@ import { useAccount } from 'wagmi';
 import { FaChevronLeft } from 'react-icons/fa';
 import { FaChevronRight } from 'react-icons/fa';
 import { useEthPrice } from '../hooks/useEthPrice';
+import { ConnectButton } from '@rainbow-me/rainbowkit';
 
 export default function OpportunitiesPage() {
   const { address } = useAccount();
@@ -86,7 +87,8 @@ export default function OpportunitiesPage() {
     async (id: bigint, amount: bigint) => {
       try {
         setError(null);
-        await donate(id, amount);
+        const txHash = await donate(id, amount);
+        return txHash;
       } catch (err) {
         console.error('Error donating:', err);
         throw new Error('Failed to process donation. Please try again.');
@@ -94,10 +96,6 @@ export default function OpportunitiesPage() {
     },
     [donate]
   );
-
-  const handleManualRefresh = useCallback(() => {
-    setCurrentPage(1); // Reset to first page when manually refreshing
-  }, [setCurrentPage]);
 
   // Add page input state
   const [pageInput, setPageInput] = useState(currentPage.toString());
@@ -116,6 +114,15 @@ export default function OpportunitiesPage() {
       setPageInput(currentPage.toString());
     }
   };
+
+  if (!isLoading && !address) {
+    return (
+      <div className='py-12 flex flex-col gap-y-4 justify-center items-center h-screen'>
+        <p className='text-gray-500'>Please connect your wallet.</p>
+        <ConnectButton />
+      </div>
+    );
+  }
 
   if (isLoading && opportunities.length === 0) {
     return (
@@ -136,18 +143,6 @@ export default function OpportunitiesPage() {
         <h1 className='text-2xl md:text-3xl font-bold'>
           Donation Opportunities
         </h1>
-        {/* <div className='flex flex-col sm:flex-row items-center gap-4'>
-          <span className='text-sm text-gray-500'>
-            Last updated: {lastRefresh.toLocaleTimeString()}
-          </span>
-          <button
-            onClick={handleManualRefresh}
-            disabled={isLoading}
-            className='w-full sm:w-auto px-4 py-2 bg-primary text-white rounded-md hover:bg-primary/90 disabled:opacity-50'
-          >
-            {isLoading ? 'Refreshing...' : 'Refresh'}
-          </button>
-        </div> */}
       </div>
 
       {(error || hookError) && (

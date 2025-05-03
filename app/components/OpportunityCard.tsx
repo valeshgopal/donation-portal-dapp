@@ -1,14 +1,14 @@
-import Link from "next/link";
-import { useState } from "react";
-import { Opportunity } from "../lib/contracts/types";
-import { formatEther, parseEther } from "viem";
-import toast from "react-hot-toast";
+import Link from 'next/link';
+import { useState } from 'react';
+import { Opportunity } from '../lib/contracts/types';
+import { formatEther, parseEther } from 'viem';
+import toast from 'react-hot-toast';
 
 export interface OpportunityCardProps {
   opportunity: Opportunity;
   userAddress?: `0x${string}`;
   onStopCampaign: (id: bigint) => Promise<void>;
-  onDonate: (id: bigint, amount: bigint) => Promise<void>;
+  onDonate: (id: bigint, amount: bigint) => Promise<`0x${string}`>;
   featured?: boolean;
   showStopButton?: boolean;
   totalUserDonation?: number;
@@ -26,18 +26,18 @@ export function OpportunityCard({
   minEthPrice = 0,
 }: OpportunityCardProps) {
   const [isUpdating, setIsUpdating] = useState(false);
-  const [donationAmount, setDonationAmount] = useState("");
+  const [donationAmount, setDonationAmount] = useState('');
   const [isProcessingDonation, setIsProcessingDonation] = useState(false);
 
   const handleStopCampaign = async () => {
-    const toastId = toast.loading("Stopping campaign...");
+    const toastId = toast.loading('Stopping campaign...');
     try {
       setIsUpdating(true);
       await onStopCampaign(opportunity.id);
-      toast.success("Campaign stopped successfully.", { id: toastId });
+      toast.success('Campaign stopped successfully.', { id: toastId });
     } catch (error) {
-      console.error("Error stopping campaign:", error);
-      toast.error("Failed to stop campaign. Please try again.", {
+      console.error('Error stopping campaign:', error);
+      toast.error('Failed to stop campaign. Please try again.', {
         id: toastId,
       });
     } finally {
@@ -49,18 +49,33 @@ export function OpportunityCard({
     e.preventDefault();
     if (!donationAmount) return;
 
-    const toastId = toast.loading("Processing donation...");
+    const toastId = toast.loading('Processing donation...');
     try {
       setIsProcessingDonation(true);
       const amount = parseEther(donationAmount);
-      await onDonate(opportunity.id, amount);
-      setDonationAmount("");
-      toast.success("Donation successful! Thank you for your contribution.", {
-        id: toastId,
-      });
+      const txHash = await onDonate(opportunity.id, amount);
+      setDonationAmount('');
+
+      // Create a transaction link for the explorer
+      const explorerUrl = `${process.env.NEXT_PUBLIC_EXPLORER_URL}/tx/${txHash}`;
+
+      toast.success(
+        <div>
+          <p>Thank you for your contribution.</p>
+          <a
+            href={explorerUrl}
+            target='_blank'
+            rel='noopener noreferrer'
+            className='text-xs text-blue-500 hover:underline mt-1 block'
+          >
+            View transaction
+          </a>
+        </div>,
+        { id: toastId }
+      );
     } catch (error) {
-      console.error("Donation error:", error);
-      toast.error("Failed to process donation. Please try again.", {
+      console.error('Donation error:', error);
+      toast.error('Failed to process donation. Please try again.', {
         id: toastId,
       });
     } finally {
@@ -72,43 +87,43 @@ export function OpportunityCard({
     (Number(opportunity.currentRaised) / Number(opportunity.fundingGoal)) * 100;
 
   return (
-    <div className="bg-white rounded-lg shadow-md overflow-hidden">
-      <div className="p-6">
-        <div className="flex justify-between items-start mb-4">
+    <div className='bg-white rounded-lg shadow-md overflow-hidden'>
+      <div className='p-6'>
+        <div className='flex justify-between items-start mb-4'>
           <Link
             href={`/opportunities/${opportunity.address}`}
-            className="text-xl font-semibold hover:text-primary truncate max-w-[80%] block"
+            className='text-xl font-semibold hover:text-primary truncate max-w-[80%] block'
           >
             {opportunity.title}
           </Link>
           <span
             className={`text-sm px-3 py-1 rounded-full ${
               opportunity.active
-                ? "bg-green-100 text-green-800"
-                : "bg-red-100 text-red-800"
+                ? 'bg-green-100 text-green-800'
+                : 'bg-red-100 text-red-800'
             }`}
           >
-            {opportunity.active ? "Active" : "Inactive"}
+            {opportunity.active ? 'Active' : 'Inactive'}
           </span>
         </div>
-        <p className="text-gray-600 mb-4 line-clamp-2">{opportunity.summary}</p>
+        <p className='text-gray-600 mb-4 line-clamp-2'>{opportunity.summary}</p>
 
-        <div className="space-y-2">
-          <div className="flex justify-between text-sm">
-            <span className="text-gray-500">Goal</span>
-            <span className="font-medium">
+        <div className='space-y-2'>
+          <div className='flex justify-between text-sm'>
+            <span className='text-gray-500'>Goal</span>
+            <span className='font-medium'>
               {formatEther(opportunity.fundingGoal)} ETH
             </span>
           </div>
-          <div className="flex justify-between text-sm">
-            <span className="text-gray-500">Raised</span>
-            <span className="font-medium">
+          <div className='flex justify-between text-sm'>
+            <span className='text-gray-500'>Raised</span>
+            <span className='font-medium'>
               {formatEther(opportunity.currentRaised)} ETH
             </span>
           </div>
-          <div className="w-full bg-gray-200 rounded-full h-2">
+          <div className='w-full bg-gray-200 rounded-full h-2'>
             <div
-              className="bg-gradient-to-r from-green-500 to-green-400 h-2 rounded-full transition-all duration-300 ease-in-out"
+              className='bg-gradient-to-r from-green-500 to-green-400 h-2 rounded-full transition-all duration-300 ease-in-out'
               style={{
                 width: `${Math.min(progress, 100)}%`,
               }}
@@ -116,68 +131,68 @@ export function OpportunityCard({
           </div>
         </div>
 
-        <div className="mt-4 flex flex-wrap gap-2">
+        <div className='mt-4 flex flex-wrap gap-2'>
           {opportunity.cause.map((tag) => (
             <span
               key={tag}
-              className="bg-gray-100 text-gray-600 px-2 py-1 rounded-full text-sm"
+              className='bg-gray-100 text-gray-600 px-2 py-1 rounded-full text-sm'
             >
               {tag}
             </span>
           ))}
         </div>
 
-        <div className="mt-4 text-sm text-gray-500">
+        <div className='mt-4 text-sm text-gray-500'>
           <div>Location: {opportunity.location}</div>
         </div>
 
         {userAddress && (
-          <form onSubmit={handleDonate} className="mt-4">
-            <div className="flex flex-col sm:flex-row gap-2">
+          <form onSubmit={handleDonate} className='mt-4'>
+            <div className='flex flex-col sm:flex-row gap-2'>
               <input
-                type="number"
-                step="any"
+                type='number'
+                step='any'
                 min={minEthPrice}
                 value={donationAmount}
                 onChange={(e) => setDonationAmount(e.target.value)}
                 placeholder={`${
-                  minEthPrice > 0 ? "min: " + minEthPrice : ""
+                  minEthPrice > 0 ? 'min: ' + minEthPrice : ''
                 } ETH`}
-                className="w-full sm:flex-1 border rounded-md px-3 py-2 text-sm sm:text-base"
+                className='w-full sm:flex-1 border rounded-md px-3 py-2 text-sm sm:text-base'
                 disabled={isProcessingDonation || !opportunity.active}
               />
               <button
-                type="submit"
+                type='submit'
                 disabled={
                   !donationAmount ||
                   parseFloat(donationAmount) < minEthPrice ||
                   isProcessingDonation ||
                   !opportunity.active
                 }
-                className="w-full sm:w-auto bg-primary text-white px-4 py-2 rounded-md hover:bg-primary/90 disabled:opacity-50 text-sm sm:text-base whitespace-nowrap"
+                className='w-full sm:w-auto bg-primary text-white px-4 py-2 rounded-md hover:bg-primary/90 disabled:opacity-50 text-sm sm:text-base whitespace-nowrap'
               >
                 {isProcessingDonation
-                  ? "Processing..."
+                  ? 'Processing...'
                   : opportunity.active
-                  ? "Donate"
-                  : "Ended"}
+                  ? 'Donate'
+                  : 'Ended'}
               </button>
             </div>
           </form>
         )}
 
         {totalUserDonation ? (
-          <p className="text-xs text-gray-500 mt-1">
-            Your contribution:{" "}
-            <span className="font-semibold">{totalUserDonation} ETH</span>
+          <p className='text-xs text-gray-500 mt-1'>
+            Your contribution:{' '}
+            <span className='font-semibold'>{totalUserDonation} ETH</span>
           </p>
         ) : null}
 
-        <div className="mt-6 space-y-2">
-          <div className="client-only">
+        <div className='mt-6 space-y-2'>
+          <div className='client-only'>
             <Link
               href={`/opportunities/${opportunity.address}`}
-              className="block text-center bg-primary text-white py-2 px-4 rounded-md hover:bg-primary/90"
+              className='block text-center bg-primary text-white py-2 px-4 rounded-md hover:bg-primary/90'
             >
               View Details
             </Link>
@@ -190,9 +205,9 @@ export function OpportunityCard({
               <button
                 onClick={handleStopCampaign}
                 disabled={isUpdating}
-                className="w-full bg-red-600 text-white py-2 px-4 rounded-md hover:bg-red-700 disabled:opacity-50"
+                className='w-full bg-red-600 text-white py-2 px-4 rounded-md hover:bg-red-700 disabled:opacity-50'
               >
-                {isUpdating ? "Stopping..." : "Stop Campaign"}
+                {isUpdating ? 'Stopping...' : 'Stop Campaign'}
               </button>
             )}
         </div>

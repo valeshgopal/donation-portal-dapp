@@ -51,7 +51,7 @@ interface DonationOpportunitiesHook {
     walletAddress: `0x${string}`,
     metadataURI: string
   ) => Promise<bigint>;
-  donate: (id: bigint, value: bigint) => Promise<void>;
+  donate: (id: bigint, value: bigint) => Promise<`0x${string}`>;
   getActiveOpportunities: DonationOpportunitiesContract['getActiveOpportunities'];
   allOpportunities: Opportunity[];
   getAllOpportunities: DonationOpportunitiesContract['getAllOpportunities'];
@@ -303,7 +303,7 @@ export function useDonationOpportunities(): DonationOpportunitiesHook {
 
   const { writeContractAsync: writeDonate } = useWriteContract();
 
-  const donate = async (id: bigint, value: bigint): Promise<void> => {
+  const donate = async (id: bigint, value: bigint): Promise<`0x${string}`> => {
     if (!publicClient) throw new Error('Public client not available');
 
     const opportunity = allOpportunities.find((opp) => opp.id === id);
@@ -321,10 +321,12 @@ export function useDonationOpportunities(): DonationOpportunitiesHook {
 
       if (!hash) throw new Error('Failed to donate');
 
+      // Wait for transaction receipt
       await publicClient.waitForTransactionReceipt({
         hash,
       });
-      await refetch();
+
+      return hash;
     } catch (err) {
       console.error('Error donating:', err);
       // Re-throw the error to ensure it's handled by the caller
