@@ -15,7 +15,7 @@ const poppins = Poppins({
 });
 
 export const metadata: Metadata = {
-  title: 'Donation Platform',
+  title: 'Fingertips',
   description: 'A decentralized platform for managing donations',
 };
 

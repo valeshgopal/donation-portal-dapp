@@ -11,7 +11,7 @@ import { Suspense } from 'react';
 import toast from 'react-hot-toast';
 import { useEthPrice } from '../../hooks/useEthPrice';
 
-// Helper function to get Sepolia explorer URLs
+// Helper function to get explorer URLs
 const getExplorerUrl = (type: 'tx' | 'address', hash: string) => {
   return `${process.env.NEXT_PUBLIC_EXPLORER_URL}/${type}/${hash}`;
 };
