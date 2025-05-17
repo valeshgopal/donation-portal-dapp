@@ -11,12 +11,12 @@ contract DonationOpportunity is ReentrancyGuard, Ownable, Pausable {
         uint256 timestamp;
     }
 
-    uint256 public constant FEE_PERCENTAGE = 500; // 5% (500/10000)
     uint256 public constant FEE_DENOMINATOR = 10000;
     uint256 public constant MAX_DONORS = 10000;
     uint256 public constant WITHDRAW_DELAY = 2 days;
     uint256 public constant MIN_DONATION = 0.0001 ether;
 
+    uint256 public feePercentage; // No longer constant, set at deployment
     string public title;
     uint256 public fundingGoal;
     uint256 public currentRaised;
@@ -56,7 +56,8 @@ contract DonationOpportunity is ReentrancyGuard, Ownable, Pausable {
         address _recipientWallet,
         address _creatorAddress,
         string memory _metadataURI,
-        address _factory
+        address _factory,
+        uint256 _feePercentage
     ) {
         require(_fundingGoal > 0, "Funding goal must be greater than 0");
         require(_recipientWallet != address(0), "Invalid recipient address");
@@ -70,6 +71,7 @@ contract DonationOpportunity is ReentrancyGuard, Ownable, Pausable {
         creatorAddress = _creatorAddress;
         metadataURI = _metadataURI;
         factory = _factory;
+        feePercentage = _feePercentage;
         active = true;
         createdAt = block.timestamp;
         
@@ -89,8 +91,8 @@ contract DonationOpportunity is ReentrancyGuard, Ownable, Pausable {
             refundAmount = msg.value - acceptedAmount;
         }
 
-        // Calculate fee (5%) on the accepted amount only
-        uint256 fee = (acceptedAmount * FEE_PERCENTAGE) / FEE_DENOMINATOR;
+        // Calculate fee using the instance's fee percentage
+        uint256 fee = (acceptedAmount * feePercentage) / FEE_DENOMINATOR;
         uint256 recipientAmount = acceptedAmount - fee;
 
         currentRaised += acceptedAmount;
@@ -185,7 +187,8 @@ contract DonationOpportunity is ReentrancyGuard, Ownable, Pausable {
         bool _active,
         uint256 _createdAt,
         uint256 _donorCount,
-        uint256 _totalFeesCollected
+        uint256 _totalFeesCollected,
+        uint256 _feePercentage
     ) {
         return (
             title,
@@ -197,7 +200,8 @@ contract DonationOpportunity is ReentrancyGuard, Ownable, Pausable {
             active,
             createdAt,
             donors.length,
-            totalFeesCollected
+            totalFeesCollected,
+            feePercentage
         );
     }
 

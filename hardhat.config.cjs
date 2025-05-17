@@ -1,7 +1,7 @@
 require("@nomicfoundation/hardhat-toolbox");
 require("dotenv").config();
 
-const SEPOLIA_URL = process.env.NEXT_PUBLIC_RPC_URL || "";
+const RPC_URL = process.env.NEXT_PUBLIC_RPC_URL || "";
 
 const config = {
   solidity: {
@@ -15,10 +15,10 @@ const config = {
   },
   networks: {
     hardhat: {
-      chainId: 1337,
+      chainId: 1,
     },
-    sepolia: {
-      url: SEPOLIA_URL,
+    mainnet: {
+      url: RPC_URL,
       accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
     },
   },
