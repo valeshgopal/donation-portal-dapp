@@ -11,12 +11,12 @@ contract DonationOpportunity is ReentrancyGuard, Ownable, Pausable {
         uint256 timestamp;
     }
 
-    uint256 public constant FEE_DENOMINATOR = 10000;
-    uint256 public constant MAX_DONORS = 10000;
+    uint256 public constant MAX_DONORS = 100000;
     uint256 public constant WITHDRAW_DELAY = 2 days;
     uint256 public constant MIN_DONATION = 0.0001 ether;
 
-    uint256 public feePercentage; // No longer constant, set at deployment
+    uint256 public feePercentage; 
+    uint256 public feeDenominator; 
     string public title;
     uint256 public fundingGoal;
     uint256 public currentRaised;
@@ -57,13 +57,16 @@ contract DonationOpportunity is ReentrancyGuard, Ownable, Pausable {
         address _creatorAddress,
         string memory _metadataURI,
         address _factory,
-        uint256 _feePercentage
+        uint256 _feePercentage,
+        uint256 _feeDenominator
     ) {
         require(_fundingGoal > 0, "Funding goal must be greater than 0");
         require(_recipientWallet != address(0), "Invalid recipient address");
         require(_creatorAddress != address(0), "Invalid creator address");
         require(_factory != address(0), "Invalid factory address");
         require(bytes(_title).length > 0, "Title cannot be empty");
+        require(_feeDenominator > 0, "Fee denominator must be greater than 0");
+        require(_feePercentage < _feeDenominator, "Fee percentage cannot be 100% or higher");
 
         title = _title;
         fundingGoal = _fundingGoal;
@@ -72,6 +75,7 @@ contract DonationOpportunity is ReentrancyGuard, Ownable, Pausable {
         metadataURI = _metadataURI;
         factory = _factory;
         feePercentage = _feePercentage;
+        feeDenominator = _feeDenominator;
         active = true;
         createdAt = block.timestamp;
         
@@ -92,7 +96,12 @@ contract DonationOpportunity is ReentrancyGuard, Ownable, Pausable {
         }
 
         // Calculate fee using the instance's fee percentage
-        uint256 fee = (acceptedAmount * feePercentage) / FEE_DENOMINATOR;
+        uint256 fee;
+        if (acceptedAmount > 0 && feePercentage > 0) {
+            fee = (acceptedAmount * feePercentage ) / feeDenominator; 
+        } else {
+            fee = 0;
+        }
         uint256 recipientAmount = acceptedAmount - fee;
 
         currentRaised += acceptedAmount;
@@ -121,8 +130,10 @@ contract DonationOpportunity is ReentrancyGuard, Ownable, Pausable {
         emit FeeTransferred(factory, fee);
 
         // Send remaining amount to recipient
-        (bool recipientSuccess, ) = recipientWallet.call{value: recipientAmount}("");
-        require(recipientSuccess, "Recipient transfer failed");
+        if (recipientAmount > 0) {
+            (bool recipientSuccess, ) = recipientWallet.call{value: recipientAmount}("");
+            require(recipientSuccess, "Recipient transfer failed");
+        }
 
         emit DonationReceived(msg.sender, acceptedAmount, block.timestamp, fee);
     
@@ -188,7 +199,8 @@ contract DonationOpportunity is ReentrancyGuard, Ownable, Pausable {
         uint256 _createdAt,
         uint256 _donorCount,
         uint256 _totalFeesCollected,
-        uint256 _feePercentage
+        uint256 _feePercentage,
+        uint256 _feeDenominator
     ) {
         return (
             title,
@@ -201,7 +213,8 @@ contract DonationOpportunity is ReentrancyGuard, Ownable, Pausable {
             createdAt,
             donors.length,
             totalFeesCollected,
-            feePercentage
+            feePercentage,
+            feeDenominator
         );
     }
 

@@ -12,20 +12,23 @@ contract OpportunityFactory is Ownable, Pausable, ReentrancyGuard {
         address indexed creator,
         string title,
         string metadataURI,
-        uint256 feePercentage
+        uint256 feePercentage,
+        uint256 feeDenominator
     );
     event FeeRecipientUpdated(address indexed newFeeRecipient);
     event FeeCollected(uint256 amount);
     event FeeWithdrawn(address indexed recipient, uint256 amount);
     event MaxOpportunitiesUpdated(uint256 newMaxOpportunities);
     event FeePercentageUpdated(uint256 newFeePercentage);
+    event FeeDenominatorUpdated(uint256 newFeeDenominator);
 
     mapping(address => address) public opportunityToCreator;
     address[] public opportunities;
     
     address public feeRecipient;
     uint256 public totalFeesCollected;
-    uint256 public feePercentage = 500; // Default 5% (500/10000)
+    uint256 public FEE_DENOMINATOR = 10000;
+    uint256 public feePercentage = 500; // Default 5% (500/FEE_DENOMINATOR)
     
     uint256 public maxOpportunities = 1000;
     uint256 public constant MIN_FUNDING_GOAL = 0.1 ether;
@@ -55,7 +58,8 @@ contract OpportunityFactory is Ownable, Pausable, ReentrancyGuard {
             msg.sender,
             _metadataURI,
             address(this),
-            feePercentage
+            feePercentage,
+            FEE_DENOMINATOR
         );
         
         address opportunityAddress = address(opportunity);
@@ -67,7 +71,8 @@ contract OpportunityFactory is Ownable, Pausable, ReentrancyGuard {
             msg.sender,
             _title,
             _metadataURI,
-            feePercentage
+            feePercentage,
+            FEE_DENOMINATOR
         );
         
         return opportunityAddress;
@@ -86,8 +91,17 @@ contract OpportunityFactory is Ownable, Pausable, ReentrancyGuard {
     }
 
     function updateFeePercentage(uint256 _newFeePercentage) external onlyOwner {
+        // Prevent fees from being 100% or higher
+        require(_newFeePercentage < FEE_DENOMINATOR, "Fee percentage cannot be 100% or higher");
         feePercentage = _newFeePercentage;
         emit FeePercentageUpdated(_newFeePercentage);
+    }
+    
+    function updateFeeDenominator(uint256 _newFeeDenominator) external onlyOwner {
+        require(_newFeeDenominator > 0, "Fee denominator must be greater than zero");
+        require(feePercentage < _newFeeDenominator, "Current fee percentage would exceed 100% with new denominator");
+        FEE_DENOMINATOR = _newFeeDenominator;
+        emit FeeDenominatorUpdated(_newFeeDenominator);
     }
 
     function getOpportunities() external view returns (address[] memory) {
@@ -133,6 +147,10 @@ contract OpportunityFactory is Ownable, Pausable, ReentrancyGuard {
 
     function getCurrentFeePercentage() external view returns (uint256) {
         return feePercentage;
+    }
+    
+    function getCurrentFeeDenominator() external view returns (uint256) {
+        return FEE_DENOMINATOR;
     }
 
     receive() external payable nonReentrant {
