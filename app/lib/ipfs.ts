@@ -1,5 +1,7 @@
 import { create } from '@web3-storage/w3up-client';
 import { StoreIndexedDB } from '@web3-storage/w3up-client/stores/indexeddb';
+import { Signer } from '@web3-storage/w3up-client/principal/ed25519';
+import * as Proof from '@web3-storage/w3up-client/proof';
 
 let client: Awaited<ReturnType<typeof create>> | null = null;
 let isInitializing = false;
@@ -17,36 +19,31 @@ export async function getIPFSClient() {
   try {
     isInitializing = true;
 
-    const store = new StoreIndexedDB('w3up');
-    client = await create({ store });
+    const principalStr = process.env.NEXT_PUBLIC_W3UP_PRINCIPAL!;
+    const proofStr = process.env.NEXT_PUBLIC_W3UP_PROOF!;
 
-    const principal = process.env.NEXT_PUBLIC_W3UP_PRINCIPAL;
-    const proof = process.env.NEXT_PUBLIC_W3UP_PROOF;
-
-    if (!principal || !proof) {
-      throw new Error(
-        'Missing Web3.Storage credentials. Please check your environment variables.'
-      );
+    if (!principalStr || !proofStr) {
+      throw new Error('Missing principal or proof in environment variables');
     }
 
-    // Check if the client already has the space associated with the proof
-    const spaces = client.spaces();
-    const hasSpace = spaces.some((space) => space.did() === proof);
+    const principal = Signer.parse(principalStr);
+    const proof = await Proof.parse(proofStr); // Convert string to Delegation object
+    let spaceDid = proof.capabilities[0].with;
 
-    if (!hasSpace) {
-      // If the space is not present, perform login to obtain delegation
-      await client.login(principal as `${string}@${string}`);
+    if (!spaceDid.startsWith('did:')) {
+      spaceDid = `did:key:${spaceDid}`;
     }
 
-    await client.setCurrentSpace(proof as `did:${string}:${string}`);
+    const store = new StoreIndexedDB('w3up'); // persists space config across sessions
+    client = await create({ principal, store });
+
+    await client.addSpace(proof); // Grant access to the space
+    await client.setCurrentSpace(spaceDid as `did:${string}:${string}`); // Set current space context
+
     return client;
   } catch (error) {
     console.error('Error initializing IPFS client:', error);
-    throw new Error(
-      `Failed to initialize IPFS client: ${
-        error instanceof Error ? error.message : 'Unknown error'
-      }`
-    );
+    throw error;
   } finally {
     isInitializing = false;
   }
@@ -56,12 +53,6 @@ export async function uploadToIPFS(data: any) {
   const client = await getIPFSClient();
   const blob = new Blob([JSON.stringify(data)], { type: 'application/json' });
   const file = new File([blob], 'metadata.json', { type: 'application/json' });
-  const cid = await client.uploadFile(file);
-  return cid.toString();
-}
-
-export async function uploadFileToIPFS(file: File) {
-  const client = await getIPFSClient();
   const cid = await client.uploadFile(file);
   return cid.toString();
 }
