@@ -1,7 +1,8 @@
-import { ethers } from "ethers";
+import { ethers } from 'ethers';
 
 // Define the Chainlink ETH/USD price feed address (Mainnet example)
-const ETH_USD_PRICE_FEED_ADDRESS = "0x694AA1769357215DE4FAC081bf1f309aDC325306"; // Change based on the network
+const ETH_USD_PRICE_FEED_ADDRESS = '0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419'; // Change based on the network
+//sepolia feed address - 0x694AA1769357215DE4FAC081bf1f309aDC325306
 //mainnet feed address - 0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419
 const RPC_URL = process.env.NEXT_PUBLIC_RPC_URL;
 
@@ -16,7 +17,7 @@ export async function getEthPrice(usdAmount: number) {
     const priceFeed = new ethers.Contract(
       ETH_USD_PRICE_FEED_ADDRESS,
       [
-        "function latestRoundData() external view returns (uint80, int256, uint256, uint256, uint80)",
+        'function latestRoundData() external view returns (uint80, int256, uint256, uint256, uint80)',
       ],
       provider
     );
@@ -29,7 +30,7 @@ export async function getEthPrice(usdAmount: number) {
 
     // Convert USD to ETH and round to 4 decimal
   } catch (error) {
-    console.error("Error fetching ETH price:", error);
+    console.error('Error fetching ETH price:', error);
   }
 }
 
