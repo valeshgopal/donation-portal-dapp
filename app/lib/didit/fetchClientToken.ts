@@ -17,22 +17,22 @@ export const fetchClientToken = async () => {
     return cachedToken;
   }
 
-  const url = process.env.NEXT_PUBLIC_DIDIT_TOKEN_URL + "/auth/v2/token/";
-  const clientID = process.env.NEXT_PUBLIC_DIDIT_CLIENT_ID;
-  const clientSecret = process.env.NEXT_PUBLIC_DIDIT_CLIENT_SECRET;
+  const url = process.env.DIDIT_TOKEN_URL + '/auth/v2/token/';
+  const clientID = process.env.DIDIT_CLIENT_ID;
+  const clientSecret = process.env.DIDIT_CLIENT_SECRET;
 
   const encodedCredentials = Buffer.from(
     `${clientID}:${clientSecret}`
-  ).toString("base64");
+  ).toString('base64');
   const params = new URLSearchParams();
-  params.append("grant_type", "client_credentials");
+  params.append('grant_type', 'client_credentials');
 
   try {
     const response = await fetch(url, {
-      method: "POST",
+      method: 'POST',
       headers: {
         Authorization: `Basic ${encodedCredentials}`,
-        "Content-Type": "application/x-www-form-urlencoded",
+        'Content-Type': 'application/x-www-form-urlencoded',
       },
       body: params,
     });
@@ -53,11 +53,11 @@ export const fetchClientToken = async () => {
       };
       return cachedToken;
     } else {
-      console.error("Error fetching client token:", data.message);
+      console.error('Error fetching client token:', data.message);
       return null;
     }
   } catch (error) {
-    console.error("Network error:", error);
+    console.error('Network error:', error);
     return null;
   }
 };
