@@ -17,6 +17,9 @@ const poppins = Poppins({
 export const metadata: Metadata = {
   title: 'Fingertips',
   description: 'A decentralized platform for managing donations',
+  icons: {
+    icon: '/favicon.jpg'
+  }
 };
 
 export default function RootLayout({
